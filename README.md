@@ -20,7 +20,7 @@ The program is written in [AutoHotkey](https://www.autohotkey.com/), which means
 
 ## Idea
 
-There are lots of such LiNe-bReAk rEmOvAl tools out there online, but what if I need... more than that lol?
+There are lots of such LiNe-bReAk rEmOvAl tools out there online, but what if I need... more than that?
 
 ## Features
 
@@ -38,20 +38,24 @@ There are lots of such LiNe-bReAk rEmOvAl tools out there online, but what if I 
 * Text Aligning
 * Text Padding
 * Line Repeat
+* Text Concatenation
 
 Other extended tweaks (case sensitivity, whole words, etc) are available for each module.
+
 ## Installation
 
 You can download [AutoHotkey](https://www.autohotkey.com/) and launch realm.ahk file directly or simply download the executable (realm.exe) file and run it.
 
 Realm is totally portable, it doesn't even write any settings to .ini file.
 
-## Development Process 
+Tested on Windows 7 and 10, but it should technically work on any Windows version that AHK supports.
 
-The tool is pretty much finished, but there are other modules and features that can be possibly added, like manipulating "columns" and so on. There are no boundaries for such a thing!
+## Development
+
+The tool, its base at least, is pretty much finished, but there are other modules and features that can be possibly added, like manipulating "columns" and so on. There are no boundaries for such a thing!
 
 I might also look into creating a help file at some point.
 
-## Credit 
+## Credits
 
-Credit goes to all AHK Forums Community, since I do surf forums a lot and might have taken some pieces of code from there. You guys are awesome!
+Credits go to all AHK Forums Community, since I do surf forums a lot and might have taken some pieces of code from there. You guys are awesome!
