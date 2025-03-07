@@ -2,7 +2,7 @@
 
 Realm is an advanced text manipulating tool that tries to cover all possible text processing operations via multiple compact modules.
 
-The user interface is quite simple, it has four tabs and two fields, one for input text, the other is for output. 
+The user interface is quite simple, it has four tabs and two edit fields, one for the input, the other is for the output. 
 
 You choose an option, tweak it as you want, hit the button and get processed text.
 
@@ -58,4 +58,5 @@ I might also look into creating a help file at some point.
 
 ## Credits
 
-Credits go to all AHK Forums Community, since I do surf forums a lot and might have taken some pieces of code from there. You guys are awesome!
+Credits go to all AHK Forums Community, since I do surf forums a lot and might have taken some pieces of code from there.
+You guys are awesome!
