@@ -52,7 +52,7 @@ Tested on Windows 7 and 10, but it should technically work on any Windows versio
 
 ## Development
 
-The tool, its base at least, is pretty much finished, but there are other modules and features that can be possibly added, like manipulating "columns" and so on. There are no boundaries for such a thing!
+The tool, its base at least, is pretty much finished, but there are other modules and features that can be possibly added, like manipulating "columns" and so on. I'll constantly update and polish Realm until I'm ran out of ideas. 
 
 I might also look into creating a help file at some point.
 
