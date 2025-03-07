@@ -42,6 +42,12 @@ There are lots of such LiNe-bReAk rEmOvAl tools out there online, but what if I 
 
 Other extended tweaks (case sensitivity, whole words, etc) are available for each module.
 
+## Additional Features
+
+The tool also provides handy options like changing font, zoom and opacity level. It has unlimited undo/redo, different "view" modes like column view and auto-result.
+
+Inline help is avaliable via tooltips (Toolbar &rarr; Help &rarr; Tooltips): hovering over certain controls will display option's description.
+
 ## Installation
 
 You can download [AutoHotkey](https://www.autohotkey.com/) and launch realm.ahk file directly or simply download the executable (realm.exe) file and run it.
