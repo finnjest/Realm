@@ -50,7 +50,7 @@ Inline help is avaliable via tooltips (Toolbar &rarr; Help &rarr; Tooltips): hov
 
 ## Installation
 
-You can download [AutoHotkey](https://www.autohotkey.com/) and launch realm.ahk file directly or simply download the executable (realm.exe) file and run it.
+You can download [AutoHotkey](https://www.autohotkey.com/) and launch realm.ahk file directly or simply go to the latest release and download .zip file with the executable.
 
 Realm is totally portable, it doesn't even write any settings to .ini file.
 
