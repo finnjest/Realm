@@ -26,8 +26,6 @@ CurrentIndex := 1
 SavedValues := []
 CaretIndices := []
 
-q := Chr(39) ; Temp solution for correct highlighting in notepad++
-
 ; -------------------------------------------------------------------------------
 ; TRAY ICON HANDLE
 ; -------------------------------------------------------------------------------
@@ -313,7 +311,7 @@ Gui Add, GroupBox, x520 y198 w273 h123, Duplicate Lines
 Gui Add, CheckBox, x528 y218 w82 h23 vIgnoreCase, Ignore Case
 Gui Add, CheckBox, x528 y242 w220 h23 vTrimSpaces hwndDLOption1, Consider Trailing and Leading Spaces
 Gui Add, CheckBox, x528 y266 w170 h23 vKeepDuplicates hwndDLOption2, Empty Line Instead of Duplicate
-Gui, Add, Checkbox, x528 y290 w150 h23 vDeleteFirstDuplicate hwndDLOption3, Don%q%t Keep First Occurrence
+Gui, Add, Checkbox, x528 y290 w150 h23 vDeleteFirstDuplicate hwndDLOption3, Don't Keep First Occurrence
 Gui Add, Button, x705 y290 w80 h23 gRemoveDuplicates, Remove
 
 ; -------------------------------------------------------------------------------
@@ -404,7 +402,7 @@ Gui Add, Radio, x528 y380 w93 h23 vFlip, Upside Down
 Gui Add, Radio, x528 y356 w90 h23 vNatural, Natural
 
 Gui Add, CheckBox, x624 y308 w135 h23 hwndSORTOption1 vReverseSorting, Reverse Sorting
-Gui Add, CheckBox, x624 y332 w135 h23 hwndSORTOption2 vConsiderCaseSorting, Consider Case
+Gui Add, CheckBox, x624 y332 w135 h23 hwndSORTOption2 vConsiderCaseSorting, Case Sensitive
 
 Gui Add, Button, x704 y388 w80 h23 gSortStrings, Sort
 
@@ -665,6 +663,15 @@ CountSentences(text) {
     }
 
     return count ? count : 0
+}
+
+; -------------------------------------------------------------------------------
+; CHECK IF MOUSE IS OVER CERTAIN CONTROL
+; -------------------------------------------------------------------------------
+
+MouseIsOver(Control) {
+    MouseGetPos,,, Win, Ctrl
+    return (Ctrl = Control)
 }
 
 ; -------------------------------------------------------------------------------
@@ -952,7 +959,7 @@ ClearAllFields:
 Return
 
 ; -------------------------------------------------------------------------------
-; HANDLE PLACEHOLDERS
+; HANDLE PLACEHOLDERS [AUTHOR: just me]
 ; -------------------------------------------------------------------------------
 
 SetEditFieldPlaceholder(HWND, Cue)
@@ -962,7 +969,7 @@ SetEditFieldPlaceholder(HWND, Cue)
 }
 
 ; -------------------------------------------------------------------------------
-; ZOOM IN\OUT\RESET + ADDITIONAL FUNCTIONS [AUTHOR: jballi]
+; ZOOM IN\OUT\RESET + ADDITIONAL FUNCTIONS [AUTHOR: jballi] [Win10+]
 ; -------------------------------------------------------------------------------
 
 Edit_EnableZoom(hEdit,p_Enable:=True)
@@ -1071,6 +1078,7 @@ return
 ; FONT [AUTHOR: maestrith]
 ; -------------------------------------------------------------------------------
 
+; https://www.autohotkey.com/board/topic/94083-ahk-11-font-and-color-dialogs/
 Font:
     if !font:=Dlg_Font(name,style,hwnd) ;shows the user the font selection dialog
         ;to get information from the style object use ( bold:=style.bold ) or ( underline:=style.underline )...
@@ -1112,6 +1120,70 @@ rgb(c){
     c:=(c&255)<<16|(c&65280)|(c>>16),c:=SubStr(c,1)
     SetFormat, integerfast,D
     return c
+}
+
+; -------------------------------------------------------------------------------
+; GETFONT [AUTHOR: teadrinker]
+; -------------------------------------------------------------------------------
+
+; https://www.autohotkey.com/boards/viewtopic.php?t=161
+
+GetFont(hWnd) {
+    static WM_GETFONT := 0x31
+
+    hFont := DllCall("SendMessage", "Ptr", hWnd, "UInt", WM_GETFONT, "Ptr", 0, "Ptr", 0, "Ptr")
+    if !hFont {
+        Gui, %hWnd%: Add, Text, xp yp wp hp Hidden hwndhText
+        hFont := DllCall("SendMessage", "Ptr", hText, "UInt", WM_GETFONT, "Ptr", 0, "Ptr", 0, "Ptr")
+        DllCall("DestroyWindow", "Ptr", hText)
+    }
+    sizeLF := DllCall("GetObject", "Ptr", hFont, "Int", 0, "Ptr", 0)
+    VarSetCapacity(LOGFONT, sizeLF, 0)
+    DllCall("GetObject", "Ptr", hFont, "Int", sizeLF, "Ptr", &LOGFONT)
+
+    Size      :=-NumGet(LOGFONT, "Int")*72//A_ScreenDPI
+    Weight    := NumGet(LOGFONT, 16, "Int")
+    Italic    := NumGet(LOGFONT, 20, "Char")
+    Underline := NumGet(LOGFONT, 21, "Char")
+    Strike    := NumGet(LOGFONT, 22, "Char")
+    Quality   := NumGet(LOGFONT, 26, "Char")
+    FaceName  := StrGet(&LOGFONT + 28)
+
+    res := {}
+    for k, v in ["Size", "Weight", "Italic", "Underline", "Strike", "Quality", "FaceName"]
+        res[v] := %v%
+    Return res
+}
+
+; -------------------------------------------------------------------------------
+; ZOOMFONT (Provides zooming to users that are not on Win10)
+; -------------------------------------------------------------------------------
+
+ZoomFont(Control, Direction) {
+    static FontData := {} ; Store font info for all controls
+
+    ; Get control handle and current font info
+    GuiControlGet, hControl, HWND, %Control%
+    fontInfo := GetFont(hControl) ; Using your GetFont() function
+
+    ; If font name changed, reset stored data
+    if (FontData.HasKey(Control) && FontData[Control].Name != fontInfo.FaceName) {
+        FontData.Delete(Control)  ; Clear old data
+    }
+
+    ; Initialize static variables if they don't exist
+    if !FontData.HasKey(Control) {
+        FontData[Control] := {Name: fontInfo.FaceName, Size: fontInfo.Size}
+    }
+
+    ; Update the size based on direction
+    newSize := FontData[Control].Size + Direction
+    newSize := newSize < 6 ? 6 : newSize > 72 ? 72 : newSize
+    FontData[Control].Size := newSize
+
+    ; Reapply font with new size but original face
+    Gui, Font, s%newSize%, % FontData[Control].Name
+    GuiControl, Font, %Control%
 }
 
 ; -------------------------------------------------------------------------------
@@ -2298,16 +2370,33 @@ NumberText:
         StartChar := StartChar ? StartChar : 1 ; Для цифр используем число 1
     }
 
+    ; if (DeleteStartNumbers = "1") {
+    ;     ; Regex to remove leading digits and special characters from the start of each line
+    ;     tempInputText := ""
+    ;     Loop, Parse, InputText, `n
+    ;     {
+    ;         ; Remove leading digits, special characters, and whitespace from the start of the line
+    ;         cleanedLine := RegExReplace(A_LoopField, "^[\s\d]+", "") ; I had /W here to remove non-word chars but it removes unicode stuff too
+    ;         tempInputText .= cleanedLine . "`n"
+    ;     }
+    ;     InputText := Trim(tempInputText, "`n")
+    ; }
+
     if (DeleteStartNumbers = "1") {
-        ; Regex to remove leading digits and special characters from the start of each line
+        ; Regex to remove leading digits and any following special characters/whitespace
         tempInputText := ""
         Loop, Parse, InputText, `n
         {
-            ; Remove leading digits, special characters, and whitespace from the start of the line
-            cleanedLine := RegExReplace(A_LoopField, "^[\s\d]+", "") ; I had /W here to remove non-word chars but it removes unicode stuff too
+            ; Remove leading digits followed by any special chars (.,), etc.) and whitespace
+            cleanedLine := RegExReplace(A_LoopField, "^[\s\d]+[\.\,\)\]\}\s]*", "")
             tempInputText .= cleanedLine . "`n"
         }
         InputText := Trim(tempInputText, "`n")
+
+        if (NumberingMode1 != "1" && NumberingMode2 != "1" && NumberingMode3 != "1") {
+            Output := Trim(tempInputText, "`n")
+        }
+
     }
 
     ; Определяем режим нумерации
@@ -2667,6 +2756,7 @@ ConvertText:
     } else if (CaseTitled) {
         StringUpper, OutputText, InputText, T
     } else if (CaseSentence) {
+        StringLower, InputText, InputText
         sentences := StrSplit(InputText, "`n") ; Разделяем текст на строки
 
         for index, line in sentences {
@@ -3061,6 +3151,26 @@ ReloadScript() {
     ^y::
     ^+z::
         Gosub, NextValue
+    return
+#If
+
+#If MouseIsOver("Edit1") && WinActive("Realm") && (A_OSVersion ~= "WIN_(7|8|8\.1|VISTA|2003|XP|2000)")
+    ^WheelUp::
+        ZoomFont("Edit1", 1)
+    return
+
+    ^WheelDown::
+        ZoomFont("Edit1", -1)
+    return
+#If
+
+#If MouseIsOver("Edit2") && WinActive("Realm") && (A_OSVersion ~= "WIN_(7|8|8\.1|VISTA|2003|XP|2000)")
+    ^WheelUp::
+        ZoomFont("Edit2", 1)
+    return
+
+    ^WheelDown::
+        ZoomFont("Edit2", -1)
     return
 #If
 ; -------------------------------------------------------------------------------
