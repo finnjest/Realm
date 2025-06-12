@@ -20,7 +20,7 @@ AlwaysOnTop := 0
 AutoInput := 0
 ColumnView := 0
 InlineTooltip := 0
-editControls := ["Edit1", "Edit2"]
+; editControls := ["Edit1", "Edit2"]
 
 CurrentIndex := 1
 SavedValues := []
@@ -202,7 +202,7 @@ Gui Add, Text, x528 y314 w45 h23, Suffix:
 Gui Add, Edit, x584 y314 w92 h21 vSuffixBasic,
 Gui Add, Text, x528 y290 w45 h23, Prefix:
 Gui Add, Edit, x584 y290 w92 h21 vPrefixBasic,
-Gui Add, CheckBox, x690 y290 w90 h21 vExcludeEmpty, Exclude Empy
+Gui Add, CheckBox, x690 y290 w90 h21 vExcludeEmpty, Exclude Empty
 Gui, Add, Checkbox, x690 y314 w90 h21 vExcludeBlank, Exclude Blank
 
 Gui Add, CheckBox, x528 y338 w120 h23 vDeleteEmpty, Delete Empty
@@ -598,24 +598,24 @@ UpdateStatusBar(control){
 ; GET SELECTED TEXT STATS WHEN MOUSE IS HELD DOWN
 ; -----------------------------------------------
 
-CheckMouseOverControls() {
-    ; Check if the mouse button is held down
-    while GetKeyState("LButton", "P")
-    {
-        ; Get the current mouse position
-        MouseGetPos, mouseX, mouseY, hwnd, control, 1
+; CheckMouseOverControls() {
+;     ; Check if the mouse button is held down
+;     while GetKeyState("LButton", "P")
+;     {
+;         ; Get the current mouse position
+;         MouseGetPos, mouseX, mouseY, hwnd, control, 1
 
-        ; Check if the control is one of the desired Edit controls
-        if (control in editControls) && (control != "SysTabControl321")
-        {
-            UpdateStatusBar(control)
-        }
+;         ; Check if the control is one of the desired Edit controls
+;         if (control in editControls) && (control != "SysTabControl321")
+;         {
+;             UpdateStatusBar(control)
+;         }
 
-        ; Sleep for a short duration to avoid high CPU usage
-        Sleep, 50
-        UpdateStatusBar(control) ; Added this little thing for accurate Update
-    }
-}
+;         ; Sleep for a short duration to avoid high CPU usage
+;         Sleep, 50
+;         UpdateStatusBar(control) ; Added this little thing for accurate Update
+;     }
+; }
 
 ; -------------------------------------------------------------------------------
 ; STATUS BAR
@@ -3104,11 +3104,11 @@ ReloadScript() {
     return
 #IfWinActive
 
-#IfWinActive, Realm
-    ~LButton::
-        CheckMouseOverControls()
-    return
-#IfWinActive
+; #IfWinActive, Realm
+;     ~LButton::
+;         CheckMouseOverControls()
+;     return
+; #IfWinActive
 
 #IfWinActive, Realm
     ~LButton Up::
@@ -3173,6 +3173,27 @@ ReloadScript() {
         ZoomFont("Edit2", -1)
     return
 #If
+
+#If MouseIsOver("Edit26") && WinActive("Realm") && (A_OSVersion ~= "WIN_(7|8|8\.1|VISTA|2003|XP|2000)")
+    +WheelUp::
+        ZoomFont("Edit26", 1)
+    return
+
+    +WheelDown::
+        ZoomFont("Edit26", -1)
+    return
+#If
+
+#If MouseIsOver("Edit1") || MouseIsOver("Edit2") || MouseIsOver("Edit26")
+    ~LButton::
+        while GetKeyState("LButton", "P")
+        {
+            UpdateStatusBar(control)
+            Sleep 50
+        }
+    return
+#If
+
 ; -------------------------------------------------------------------------------
 ; ---------------------------------- DIALOGS ------------------------------------
 ; -------------------------------------------------------------------------------
