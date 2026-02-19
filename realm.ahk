@@ -1,4 +1,4 @@
-#NoTrayIcon
+﻿#NoTrayIcon
 #SingleInstance, Force
 SetBatchLines, -1
 
@@ -10,9 +10,10 @@ FileEncoding, UTF-8
 ; VARIABLES
 ; -------------------------------------------------------------------------------
 
-version := "v1.0.0"
+version := "v2.0.0"
 
-Global KeepEmptyLines
+global isSilent := false
+global KeepEmptyLines
 global LastFoundPos := 0
 global CurrentSavePath := ""
 
@@ -21,10 +22,39 @@ AutoInput := 0
 ColumnView := 0
 InlineTooltip := 0
 ; editControls := ["Edit1", "Edit2"]
+g_OnCloseAction := "Exit"
 
 CurrentIndex := 1
 SavedValues := []
 CaretIndices := []
+
+; -------------------------------------------------------------------------------
+; PASSED PARAMETER HANDLE
+; -------------------------------------------------------------------------------
+
+if 0 > 0
+{
+    Loop, %0%
+    {
+        arg := %A_Index%
+
+        if (arg = "-silent")
+        {
+            isSilent := true
+        }
+    }
+}
+; MsgBox, Parameter %A_Index%: %arg%
+
+; -------------------------------------------------------------------------------
+; PASSED VARIABLE FROM CORE SCRIPT
+; -------------------------------------------------------------------------------
+
+if (libRealm) {
+    Menu, Tray, Icon
+    ; Msgbox, %A_IconHidden%
+    return
+}
 
 ; -------------------------------------------------------------------------------
 ; TRAY ICON HANDLE
@@ -39,14 +69,24 @@ if FileExist(a_scriptDir . "\icon\realm.ico") {
 ; -------------------------------------------------------------------------------
 
 ; -------------------------------------------------------------------------------
+; TRAY MENU
+; -------------------------------------------------------------------------------
+
+Menu, Tray, Tip, Realm
+Menu, Tray, NoStandard
+Menu, Tray, Add, Show, TrayShow
+Menu, Tray, Add, Exit, TrayExit
+Menu, Tray, Default, Show
+
+; -------------------------------------------------------------------------------
 ; MENU BAR
 ; -------------------------------------------------------------------------------
 
-Menu, FileMenu, Add, New, ReloadScript
+Menu, FileMenu, Add, New, ReloadRealm
 Menu, FileMenu, Add, Open, SelectFile
 Menu, FileMenu, Add, Save `tCTRL + S, FileSave
 Menu, FileMenu, Add, Save As, FileSaveAs
-Menu, FileMenu, Add ; Separator
+Menu, FileMenu, Add
 Menu, FileMenu, Add, Exit `tEsc, GuiClose
 
 Menu, EditMenu, Add, Undo `tCTRL + Z, Undo
@@ -87,6 +127,11 @@ Menu, SettingsMenu, Add, Auto Result, ToggleAutoInput
 Menu, SettingsMenu, Uncheck, Auto Result
 Menu, SettingsMenu, Add, Column Mode, ColumnMod
 Menu, SettingsMenu, Uncheck, Column Mode
+Menu, SettingsMenu, Add
+Menu, OnCloseSubMenu, Add, Minimize To Tray, ContextSetOnCloseAction
+Menu, OnCloseSubMenu, Add, Exit, ContextSetOnCloseAction
+Menu, SettingsMenu, Add, On GUI Close, :OnCloseSubMenu
+Menu, OnCloseSubMenu, Check, % g_OnCloseAction
 
 Menu, HelpMenu, Add, Tooltips, HelpTooltips
 Menu, HelpMenu, Uncheck, Tooltips
@@ -118,8 +163,8 @@ Gui, Font, s8, MS Shell Dlg
 ; GUI ADDITIONAL HANDLING
 ; -------------------------------------------------------------------------------
 
-OnMessage(0x6, "WM_ACTIVATE")
-Gui, +hwndhwnd
+OnMessage(0x6, "WM_ACTIVATE") ; Causes delayed dragging when nothing is activated
+Gui, +dpiscale +hwndhwnd
 
 ; -------------------------------------------------------------------------------
 ; INPUT AND OUTPUT FIELDS
@@ -139,11 +184,11 @@ Edit_EnableZoom(Edit1)
 ; QUICK COMMANDS
 ; -------------------------------------------------------------------------------
 
-Gui Add, GroupBox, x122 y344 w272 h54 vQuickCommandsBox,
+Gui Add, GroupBox, x122 y344 w272 h54 vQuickCommandsBox
 
-Gui Add, Button, x130 y363 w80 h23 gCopyToInput vSendToInputButton hwndOutputToInputOption, Send to Input
-Gui Add, Button, x218 y363 w80 h23 gCopyEditedTextToClipboard vCopyOutputButton, Copy Output
-Gui Add, Button, x306 y363 w80 h23 gClearAllFields vClearButton hwndClearOption, Clear
+Gui Add, Button, x130 y362 w80 h23 gCopyToInput vSendToInputButton hwndOutputToInputOption, Send to Input
+Gui Add, Button, x218 y362 w80 h23 gCopyEditedTextToClipboard vCopyOutputButton, Copy Output
+Gui Add, Button, x306 y362 w80 h23 gClearAllFields vClearButton hwndClearOption, Clear
 
 ; -------------------------------------------------------------------------------
 ; QUICK COMMANDS AUTO RESULT MOD [INITIALLY HIDDEN]
@@ -151,7 +196,7 @@ Gui Add, Button, x306 y363 w80 h23 gClearAllFields vClearButton hwndClearOption,
 
 Gui, Font, s10  bold, Consolas
 Gui Add, Button, x122 y683 w46 h23 gPreviousValue vHistoryPrevious hwndUndoButton, <<
-Gui,Add, Button, x352 y683 w46 h23 gNextValue vHistoryNext hwndRedoButton, >>
+Gui Add, Button, x352 y683 w46 h23 gNextValue vHistoryNext hwndRedoButton, >>
 GuiControl, Hide, HistoryPrevious
 GuiControl, Hide, HistoryNext
 Gui, Font
@@ -161,7 +206,7 @@ Gui, Font, s8, MS Shell Dlg
 ; TAB FOR MAIN MODULES
 ; -------------------------------------------------------------------------------
 
-Gui, Add, Tab3, x512 y5 w290 h717 vModuleGround, Basic|Spaces-Breaks|Remove|Sort-Position
+Gui, Add, Tab3, x512 y5 w290 h717 vModuleGround, Basic|Spaces-Breaks|Remove|Misc
 
 Gui, Tab, Basic
 
@@ -198,17 +243,32 @@ Gui Add, Button, x704 y229 w80 h23 gReplaceText, Replace
 ; -------------------------------------------------------------------------------
 
 Gui Add, GroupBox, x520 y266 w272 h135, Add Suffix / Preffix
-Gui Add, Text, x528 y314 w45 h23, Suffix:
-Gui Add, Edit, x584 y314 w92 h21 vSuffixBasic,
 Gui Add, Text, x528 y290 w45 h23, Prefix:
 Gui Add, Edit, x584 y290 w92 h21 vPrefixBasic,
+Gui Add, Text, x528 y314 w45 h23, Suffix:
+Gui Add, Edit, x584 y314 w92 h21 vSuffixBasic,
 Gui Add, CheckBox, x690 y290 w90 h21 vExcludeEmpty, Exclude Empty
-Gui, Add, Checkbox, x690 y314 w90 h21 vExcludeBlank, Exclude Blank
+Gui Add, Checkbox, x690 y314 w90 h21 vExcludeBlank, Exclude Blank
 
 Gui Add, CheckBox, x528 y338 w120 h23 vDeleteEmpty, Delete Empty
-Gui, Add, Checkbox, x528 y362 w120 h23 vDeleteBlank, Delete Blank
+Gui Add, Checkbox, x528 y362 w120 h23 vDeleteBlank, Delete Blank
 
 Gui Add, Button, x704 y370 w80 h23 gAddSuffixPrefix, Add
+
+; -------------------------------------------------------------------------------
+; ENCLOSE []
+; -------------------------------------------------------------------------------
+
+; Gui Add, GroupBox, x520 y408 w272 h85, Enclose
+; Gui Add, Text, x528 y432 w52 h23, Enclose:
+; Gui Add, Edit, x584 y432 w35 h21 vEncloseLeft Right
+; Gui Add, Text, x625 y436 w34 h23, X
+; Gui Add, Edit, x640 y432 w35 h21 vEncloseRight Left
+
+; Gui Add, DropDownList, x528 y462 w140 vEncloseType gEncloseTypeChanged, Guillemets||Double|Single|DoubleSmart|SingleSmart|Custom
+; Gui Add, Button, x704 y462 w80 h23 gEncloseText, Add
+; GuiControl, Disable, EncloseLeft
+; GuiControl, Disable, EncloseRight
 
 Gui, Tab, Spaces-Breaks
 
@@ -224,7 +284,7 @@ Gui Add, CheckBox, x648 y80 w100 h16 vTrimStart hwndSROption4, Trim Leading
 Gui Add, CheckBox, x648 y104 w108 h16 vRemoveExtra hwndSROption5, Trim Extra Inside
 Gui Add, CheckBox, x528 y104 w115 h16 vRemoveExtraWholeText hwndSROption6, Reduce to Single
 Gui Add, CheckBox, x528 y128 w100 h16 vRemoveAllSpaces hwndSROption7, Remove All
-Gui Add, Button, x704 y128 w80 h25 gRemoveSpaces, Trim/Reduce
+Gui Add, Button, x704 y128 w80 h25 gRemoveSpaces, Process
 
 ; -------------------------------------------------------------------------------
 ; LINE BREAKS BASIC
@@ -283,17 +343,10 @@ Gui, Tab, Remove
 Gui Add, GroupBox, x520 y32 w273 h159, Deletion
 Gui Add, Text, x528 y56 w98 h23 vDeletionSharedLabel1, Choose an Option:
 Gui Add, Edit, x664 y56 w96 h20 vDeletionEditField1
+GuiControl, Disabled, DeletionEditField1
 Gui Add, Text, x528 y80 w121 h23 vDeletionSharedLabel2, From Drop Down List:
 Gui Add, Edit, x664 y80 w96 h20 vDeletionEditField2
-
-; Gui Add, Text, x536 y56 w98 h23, Delete Containing:
-; Gui Add, Edit, x664 y56 w96 h20 vRemoveText
-; Gui Add, Text, x536 y80 w121 h23, Delete NOT Containing:
-; Gui Add, Edit, x664 y80 w96 h20 vRemoveNotText
-; Gui Add, Text, x536 y112 w76 h23, Delete Before:
-; Gui Add, Edit, x664 y112 w96 h20 vRemoveBefore
-; Gui Add, Text, x536 y136 w67 h23, Delete After:
-; Gui Add, Edit, x664 y136 w96 h20 vRemoveAfter
+GuiControl, Disabled, DeletionEditField2
 
 Gui Add, DDL, x528 y160 w140 h80 vActionType gActionTypeChanged hwndDOption1, Delete Containing|Delete NOT Containing|Delete Before and After|Delete Block
 Gui Add, CheckBox, x528 y105 w98 h23 vIsLineContext hwndDOption2, Line by Line
@@ -309,13 +362,13 @@ Gui Add, Button, x705 y160 w80 h23 gDellActionButton, Delete
 
 Gui Add, GroupBox, x520 y198 w273 h123, Duplicate Lines
 Gui Add, CheckBox, x528 y218 w82 h23 vIgnoreCase, Ignore Case
-Gui Add, CheckBox, x528 y242 w220 h23 vTrimSpaces hwndDLOption1, Consider Trailing and Leading Spaces
+Gui Add, CheckBox, x528 y242 w220 h23 vTrimSpaces hwndDLOption1, Ignore Trailing and Leading Spaces
 Gui Add, CheckBox, x528 y266 w170 h23 vKeepDuplicates hwndDLOption2, Empty Line Instead of Duplicate
 Gui, Add, Checkbox, x528 y290 w150 h23 vDeleteFirstDuplicate hwndDLOption3, Don't Keep First Occurrence
 Gui Add, Button, x705 y290 w80 h23 gRemoveDuplicates, Remove
 
 ; -------------------------------------------------------------------------------
-; EMPTY LINES REMOVAL
+; EMPTY AND BLANK LINES REMOVAL
 ; -------------------------------------------------------------------------------
 
 Gui Add, GroupBox, x520 y328 w273 h52, Empty Lines
@@ -334,7 +387,7 @@ Gui Add, Edit, x528 y409 w170 h20 hwndSCREdit vRemoveCharsField
 SetEditFieldPlaceholder(SCREdit, " Enter Characters without Spaces")
 Gui Add, Button, x705 y408 w80 h23 gRemoveChars, Remove
 
-Gui, Tab, Sort-Position
+Gui, Tab, Misc
 
 ; -------------------------------------------------------------------------------
 ; NUMBERING
@@ -342,12 +395,12 @@ Gui, Tab, Sort-Position
 
 Gui Add, GroupBox, x520 y32 w273 h175, Numbering
 
-Gui Add, Radio, x528 y48 w70 h20 vNumberingMode1, Numbers
-Gui Add, Radio, x712 y48 w70 h20 vNumberingMode3, Letters
-Gui Add, Radio, x600 y48 w110 h20 vNumberingMode2, Roman Numerals
+Gui Add, Radio, x528 y48 w70 h20 vNumberingMode1 gNumberingMode1, Numbers
+Gui Add, Radio, x600 y48 w110 h20 vNumberingMode2 gNumberingMode2, Roman Numerals
+Gui Add, Radio, x712 y48 w70 h20 vNumberingMode3 gNumberingMode3, Letters
 
-Gui Add, Text, x528 y80 w63 h23, Start with:
-Gui Add, Edit, x596 y78 w25 h20 vStartChar
+Gui Add, Text, x528 y80 w63 h23, Start:
+Gui Add, Edit, x576 y78 w45 h20 gStartChar vStartChar
 
 Gui Add, Text, x528 y128 w38 h23, Suffix:
 Gui Add, Edit, x576 y126 w45 h20 vPrefix
@@ -384,9 +437,10 @@ Gui Add, Button, x704 y176 w80 h23 gNumberText, Number
 
 Gui Add, GroupBox, x520 y213 w273 h73, Case Changing
 Gui Add, Radio, x528 y229 w70 h23 vCaseUpper, Upper
-Gui Add, Radio, x600 y229 w66 h23 vCaseLower, Lower
-Gui Add, Radio, x528 y253 w68 h23 vCaseTitled, Title
-Gui Add, Radio, x600 y253 w70 h23 vCaseSentence, Sentence
+Gui Add, Radio, x616 y229 w66 h23 vCaseLower, Lower
+Gui Add, Radio, x528 y253 w68 h23 vCaseSentence, Sentence
+Gui Add, Radio, x616 y253 w70 h23 vCaseTitled, Title
+Gui Add, Radio, x704 y229 w66 h23 vCaseInvert, Invert
 Gui Add, Button, x704 y253 w80 h23 gConvertText, Change
 
 ; -------------------------------------------------------------------------------
@@ -394,12 +448,10 @@ Gui Add, Button, x704 y253 w80 h23 gConvertText, Change
 ; -------------------------------------------------------------------------------
 
 Gui Add, GroupBox, x520 y292 w273 h127, Sorting
-Gui Add, Radio, x528 y308 w88 h23 vAlph, Alphabetical
-
-Gui Add, Radio, x528 y332 w90 h23 vLineLength, Line Length
-
-Gui Add, Radio, x528 y380 w93 h23 vFlip, Upside Down
-Gui Add, Radio, x528 y356 w90 h23 vNatural, Natural
+Gui Add, Radio, x528 y308 w88 h23 vAlph gAlph, Alphabetical
+Gui Add, Radio, x528 y332 w90 h23 vLineLength gLineLength, Line Length
+Gui Add, Radio, x528 y380 w93 h23 vFlip gFlip, Upside Down
+Gui Add, Radio, x528 y356 w90 h23 vNatural gNatural, Natural
 
 Gui Add, CheckBox, x624 y308 w135 h23 hwndSORTOption1 vReverseSorting, Reverse Sorting
 Gui Add, CheckBox, x624 y332 w135 h23 hwndSORTOption2 vConsiderCaseSorting, Case Sensitive
@@ -488,11 +540,14 @@ Gui Add, Button, x704 y49 w80 h23 gConcatenateColumns, Process
 ; -------------------------------------------------------------------------------
 ; SHOWING THE GUI
 ; -------------------------------------------------------------------------------
+if (!isSilent) {
+    Gui, Show, w814 h750, Realm
+    Gui, Show, AutoSize
 
-Gui, Show, w814 h750, Realm
-
-Gosub, InlineHelp
-Gosub, UpdateStats
+    Gosub, InlineHelp
+    Gosub, UpdateStats
+    Gosub, EncloseTypeChanged
+}
 return
 
 ; -------------------------------------------------------------------------------
@@ -553,92 +608,54 @@ UpdateStats:
 return
 
 ; -------------------------------------------------------------------------------
-; STATUS BAR
+; STATUS BAR: SELECTED TEXT STATS
 ; -------------------------------------------------------------------------------
-; SELECTED TEXT STATS
-; -------------------
 
 UpdateStatusBar(control){
-    ; Get the current focused control
     ControlGetFocus, focusedControl, ahk_class AutoHotkeyGUI
 
-    ; Retrieve the selected text (if any) from the focused Edit control
     selectedText := ""
-    ControlGet, selectedText, Selected,, %focusedControl%, ahk_class AutoHotkeyGUI
-
-    ; If text is selected, count the lines, characters, and words
+    ControlGet, selectedText, Selected,, %focusedControl%, A
+    ControlGet, OutputCol, CurrentCol,, %focusedControl%, A
+    ControlGet, OutputLine, CurrentLine,, %focusedControl%, A
     if (selectedText != "")
     {
-        ; Count number of lines by splitting the text at newline characters
         lines := 0
         Loop, Parse, selectedText, `n, `r
         {
             lines++
         }
 
-        ; Count number of characters (excluding line breaks)
-        chars := StrLen(selectedText) - (lines - 1) ; Subtracting line breaks
-
-        ; Count words
+        chars := StrLen(selectedText) - (lines - 1)
         words := CountWords(selectedText)
-
-        ; Update the status bar with the new information
         SB_SetText("Selected: " chars " | " lines " | " words, 5)
     }
     else
     {
-        ; If no text is selected, reset to 0
+        ; if (focusedControl = "Edit1" || focusedControl = "Edit2" || focusedControl = "Edit26")
+        ; {
+        ;     SB_SetText("Ln " OutputLine " Col " OutputCol, 5)
+        ; }
         SB_SetText("Selected: 0 | 0 | 0", 5)
     }
 }
 
 ; -------------------------------------------------------------------------------
-; STATUS BAR
+; COUNT WORDS, LINES AND SENTENCES FOR INPUT \ OUTPUT
 ; -------------------------------------------------------------------------------
-; GET SELECTED TEXT STATS WHEN MOUSE IS HELD DOWN
-; -----------------------------------------------
-
-; CheckMouseOverControls() {
-;     ; Check if the mouse button is held down
-;     while GetKeyState("LButton", "P")
-;     {
-;         ; Get the current mouse position
-;         MouseGetPos, mouseX, mouseY, hwnd, control, 1
-
-;         ; Check if the control is one of the desired Edit controls
-;         if (control in editControls) && (control != "SysTabControl321")
-;         {
-;             UpdateStatusBar(control)
-;         }
-
-;         ; Sleep for a short duration to avoid high CPU usage
-;         Sleep, 50
-;         UpdateStatusBar(control) ; Added this little thing for accurate Update
-;     }
-; }
-
+; https://www.autohotkey.com/boards/viewtopic.php?t=63302
 ; -------------------------------------------------------------------------------
-; STATUS BAR
-; -------------------------------------------------------------------------------
-; INPUT \ OUTPUT FIELDS: WORDS, LINES AND SENTENCES COUNT
-; -------------------------------------------------------
 
 CountWords(text) {
     text := Trim(text)
     if (text = "")
         return 0
-
-    ; Replace multiple consecutive spaces and line breaks with single space
     text := RegExReplace(text, "[\s\r\n]+", " ")
-
-    ; Remove leading and trailing spaces
     text := Trim(text)
 
-    ; If text is empty after trimming, return 0
     if (text = "")
         return 0
 
-    ; Count words by counting spaces and adding 1
     StringReplace, text, text, %A_Space%, %A_Space%, UseErrorLevel
     return ErrorLevel + 1
 }
@@ -653,7 +670,6 @@ CountLines(text) {
 }
 
 CountSentences(text) {
-    ; Count sentences by counting .!? followed by space or end of line
     count := 0
     pos := 1
 
@@ -675,17 +691,18 @@ MouseIsOver(Control) {
 }
 
 ; -------------------------------------------------------------------------------
-; REMOVES INITIAL FOCUS FROM THE GUI [AUTHOR: teadrinker]
+; GUI ON CLOSE ACTION MENU: TO TRAY OR EXIT
 ; -------------------------------------------------------------------------------
 
-WM_ACTIVATE(wp, lp, msg, hwnd) {
-    static WA_ACTIVE := 1
-    if (wp = WA_ACTIVE)
-        GuiControl, %hwnd%: Focus, Static1
-}
+ContextSetOnCloseAction:
+    g_OnCloseAction := A_ThisMenuItem
+    Menu, OnCloseSubMenu, Uncheck, Exit
+    Menu, OnCloseSubMenu, Uncheck, Minimize To Tray
+    Menu, OnCloseSubMenu, Check, %g_OnCloseAction%
+return
 
 ; -------------------------------------------------------------------------------
-; TOGLE STATUS BAR VISIBILITY ON AND OFF
+; TOGLE STATUS BAR
 ; -------------------------------------------------------------------------------
 
 ToggleStatusBar() {
@@ -699,10 +716,11 @@ ToggleStatusBar() {
         isVisible := true
         Menu, ViewMenu, Check, Status Bar
     }
+    Gui, Show, AutoSize
 }
 
 ; -------------------------------------------------------------------------------
-; SET WINDOW ALWAYS ON TOP
+; TOGGLE WINDOW ALWAYS ON TOP
 ; -------------------------------------------------------------------------------
 
 ToggleAlwaysOnTop() {
@@ -720,7 +738,7 @@ ToggleAlwaysOnTop() {
 }
 
 ; -------------------------------------------------------------------------------
-; SET AUTO RESULT FOR INPUT FIELD
+; TOGGLE AUTO RESULT MODE
 ; -------------------------------------------------------------------------------
 
 ToggleAutoInput() {
@@ -737,6 +755,7 @@ ToggleAutoInput() {
         GuiControl, Move, ClearButton, x262 y683
         GuiControl, Show, HistoryPrevious
         GuiControl, Show, HistoryNext
+        Menu, SettingsMenu, Disable, Column Mode
         AutoInput := 1
         Gosub, UpdateStats
     }
@@ -751,12 +770,13 @@ ToggleAutoInput() {
         GuiControl, Move, ClearButton, x306 y363 w80 h23
         GuiControl, Hide, HistoryPrevious
         GuiControl, Hide, HistoryNext
+        Menu, SettingsMenu, Enable, Column Mode
         AutoInput := 0
         Gosub, UpdateStats
     }
     else if (ColumnView = 1 && AutoInput = 0) {
         Tooltip, Disable Column Mode first.
-        SetTimer, RemoveToolTip, -2000
+        SetTimer, RemoveToolTipRealm, -2000
     }
 }
 
@@ -775,6 +795,7 @@ ColumnMod() {
         GuiControl, Move, InputText, w239 h310
         GuiControl, Text, InputTextLabel, Column 1:
         Menu, SettingsMenu, Check, Column Mode
+        Menu, SettingsMenu, Disable, Auto Result
         ColumnView := 1
         Gosub, UpdateStats
 
@@ -787,32 +808,50 @@ ColumnMod() {
         GuiControl, Move, InputText, w487 h310
         GuiControl, Text, InputTextLabel, Input Text:
         Menu, SettingsMenu, Uncheck, Column Mode
+        Menu, SettingsMenu, Enable, Auto Result
         ColumnView := 0
         Gosub, UpdateStats
     }
     else if (AutoInput = 1 && ColumnView = 0) {
         Tooltip, Disable Auto Result first.
-        SetTimer, RemoveToolTip, -2000
+        SetTimer, RemoveToolTipRealm, -2000
     }
 }
+
+; -------------------------------------------------------------------------------
+; HELP TOOLTIP TOGGLE
+; -------------------------------------------------------------------------------
+
+HelpTooltips:
+    global InlineTooltip
+    if (InlineTooltip = 0) {
+        Menu, HelpMenu, Check, Tooltips
+        InlineTooltip := 1
+        Help.Suspend(False)
+        Tooltip, Inline help is enabled. Hovering over certain`ncontrols will display Help Tooltips.
+        SetTimer, RemoveToolTipRealm, -4000
+    }
+    else {
+
+        Menu, HelpMenu, Uncheck, Tooltips
+        InlineTooltip := 0
+        Help.Suspend(True)
+        Tooltip, Inline help is disabled. Help Tooltips`nwont be shown.
+        SetTimer, RemoveToolTipRealm, -3000
+    }
+return
 
 ; -------------------------------------------------------------------------------
 ; SET WINDOW TRANSPARENCY LEVEL
 ; -------------------------------------------------------------------------------
 
 SetTransparency() {
-    ; Array of transparency percentages
     transparencyOptions := ["0% (Opaque)", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%"]
 
-    ; Uncheck all menu items
     for index, option in transparencyOptions {
         Menu, TransparencyMenu, UnCheck, %option%
     }
-
-    ; Check the selected menu item
     Menu, TransparencyMenu, Check, %A_ThisMenuItem%
-
-    ; Mapping of transparency percentages to actual transparency values
     transparencyMap := {"90%": 25, "80%": 51, "70%": 76, "60%": 102, "50%": 127, "40%": 153, "30%": 178, "20%": 204, "10%": 229, "0% (Opaque)": "OFF"}
 
     transparencyValue := transparencyMap[A_ThisMenuItem]
@@ -825,7 +864,7 @@ SetTransparency() {
 ; -------------------------------------------------------------------------------
 
 SelectFile:
-    Gui, +OwnDialogs ; Highest Priority
+    Gui, +OwnDialogs
     FileSelectFile, SelectedFile, 3,, Open, Text Files (*.txt)
     if (SelectedFile) {
         FileRead, FileContent, %SelectedFile%
@@ -841,21 +880,20 @@ return
 FileSave:
     Gui, Submit, NoHide
 
-    ; If no previous save path exists, prompt for file selection
     if (CurrentSavePath = "") {
-        Gui, +OwnDialogs ; Highest Priority
+        Gui, +OwnDialogs
         FileSelectFile, SavePath, S16, output.txt, Save Output Contents, Text Files (*.txt)
         if (SavePath != "") {
             CurrentSavePath := SavePath
         } else {
-            return ; Cancel if no file selected
+            return
         }
     }
 
     FileDelete, %CurrentSavePath%
     FileAppend, %OutputText%, %CurrentSavePath%
     Tooltip, Contents saved to %CurrentSavePath%
-    SetTimer, RemoveToolTip, -2000
+    SetTimer, RemoveToolTipRealm, -2000
 return
 
 ; -------------------------------------------------------------------------------
@@ -871,7 +909,7 @@ FileSaveAs:
         FileDelete, %CurrentSavePath%
         FileAppend, %OutputText%, %CurrentSavePath%
         Tooltip, Contents saved to %CurrentSavePath%
-        SetTimer, RemoveToolTip, -2000
+        SetTimer, RemoveToolTipRealm, -2000
     }
 return
 
@@ -899,11 +937,11 @@ CopyEditedTextToClipboard:
     GuiControlGet, OutputText,, OutputText
     Clipboard := OutputText
     ToolTip, Copied: %Clipboard%
-    SetTimer, RemoveToolTip, -1500
+    SetTimer, RemoveToolTipRealm, -1500
 Return
 
 ; -------------------------------------------------------------------------------
-; CLEAR ALL FIELDS
+; CLEAR ALL EDIT FIELDS
 ; -------------------------------------------------------------------------------
 
 ClearAllFields:
@@ -959,7 +997,25 @@ ClearAllFields:
 Return
 
 ; -------------------------------------------------------------------------------
-; HANDLE PLACEHOLDERS [AUTHOR: just me]
+; ---------------------------------- HANDLERS -----------------------------------
+; -------------------------------------------------------------------------------
+
+; -------------------------------------------------------------------------------
+; REMOVE INITIAL FOCUS FROM THE GUI [AUTHOR: teadrinker]
+; -------------------------------------------------------------------------------
+; https://www.autohotkey.com/boards/viewtopic.php?style=1&f=76&t=62796
+; -------------------------------------------------------------------------------
+
+WM_ACTIVATE(wp, lp, msg, hwnd) {
+    static WA_ACTIVE := 1
+    if (wp = WA_ACTIVE)
+        GuiControl, %hwnd%: Focus, Static1
+}
+
+; -------------------------------------------------------------------------------
+; PLACEHOLDER [AUTHOR: just me]
+; -------------------------------------------------------------------------------
+; https://www.autohotkey.com/board/topic/76529-solvedgray-placeholder-text/
 ; -------------------------------------------------------------------------------
 
 SetEditFieldPlaceholder(HWND, Cue)
@@ -971,90 +1027,8 @@ SetEditFieldPlaceholder(HWND, Cue)
 ; -------------------------------------------------------------------------------
 ; ZOOM IN\OUT\RESET + ADDITIONAL FUNCTIONS [AUTHOR: jballi] [Win10+]
 ; -------------------------------------------------------------------------------
-
-Edit_EnableZoom(hEdit,p_Enable:=True)
-{
-    Static ES_EX_ZOOMABLE:=0x10
-    Return Edit_SetExtendedStyle(hEdit,ES_EX_ZOOMABLE,p_Enable ? ES_EX_ZOOMABLE:0)
-}
-
-Edit_SetExtendedStyle(hEdit,p_Mask,p_ExStyle)
-{
-    Static Dummy69574821
-        ,S_OK:=0x0
-        ,EM_SETEXTENDEDSTYLE:=0x150A
-
-    SendMessage EM_SETEXTENDEDSTYLE,p_Mask,p_ExStyle,,ahk_id %hEdit%
-    Return ErrorLevel="FAIL" ? False:ErrorLevel=S_OK or ErrorLevel=0x10 ? True:False
-}
-
-Edit_GetZoom(hEdit,ByRef r_Numerator:="",ByRef r_Denominator:="",ByRef r_ZoomPct:="")
-{
-    Static EM_GETZOOM:=0x4E0  ;-- WM_USER+224
-
-    ;-- Get Zoom
-    r_Numerator:=r_Denominator:=0  ;-- Initialize jic SendMessage fails
-    DllCall("SendMessage" . (A_IsUnicode ? "W":"A")
-        ,"UPtr",hEdit
-        ,"UInt",EM_GETZOOM
-        ,"UInt*",r_Numerator
-        ,"UInt*",r_Denominator)
-
-    ;-- Populate output variables and return object
-    r_ZoomPct:=r_Denominator ? Round((r_Numerator/r_Denominator)*100):0
-    Return {Numerator:r_Numerator,Denominator:r_Denominator,ZoomPct:r_ZoomPct}
-}
-
-Edit_ZoomIn(hEdit,p_IncrementPct:=10,p_MaxZoomPct:=9999)
-{
-    Static EM_SETZOOM:=0x4E1  ;-- WM_USER+225
-
-    ;-- Get the current zoom factor
-    ;   Bounce if there is no zoom percent (Error or zoom not enabled)
-    Edit_GetZoom(hEdit,Numerator,Denominator,ZoomPct)
-    if (ZoomPct=0)
-        Return False
-
-    ;-- If needed, reset values
-    if (Numerator=Denominator)
-        Numerator:=Denominator:=100
-
-    ;-- Zoom in by the specified percentage
-    Numerator:=Min(p_MaxZoomPct,Numerator+p_IncrementPct)
-
-    ;-- Set zoom
-    SendMessage EM_SETZOOM,Numerator,100,,ahk_id %hEdit%
-    Return ErrorLevel="FAIL" ? False:ErrorLevel
-}
-
-Edit_ZoomOut(hEdit,p_DecrementPct:=10,p_MinZoomPct:=10)
-{
-    Static EM_SETZOOM:=0x4E1  ;-- WM_USER+225
-
-    ;-- Get the current zoom factor
-    ;   Bounce if there is no zoom percent (Error or zoomable not enabled)
-    Edit_GetZoom(hEdit,Numerator,Denominator,ZoomPct)
-    if (ZoomPct=0)
-        Return False
-
-    ;-- If needed, reset values
-    if (Numerator=Denominator)
-        Numerator:=Denominator:=100
-
-    ;-- Zoom out
-    Numerator:=Max(p_MinZoomPct,Numerator-p_DecrementPct)
-
-    ;-- Set zoom
-    SendMessage EM_SETZOOM,Numerator,100,,ahk_id %hEdit%
-    Return ErrorLevel="FAIL" ? False:ErrorLevel
-}
-
-Edit_ZoomReset(hEdit)
-{
-    Static EM_SETZOOM:=0x4E1  ;-- WM_USER+225
-    SendMessage EM_SETZOOM,100,100,,ahk_id %hEdit%
-    Return ErrorLevel="FAIL" ? False:ErrorLevel
-}
+; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=5063
+; -------------------------------------------------------------------------------
 
 ResetFont:
     Edit_ZoomReset(Edit)
@@ -1074,14 +1048,86 @@ ZoomOut:
     Edit_ZoomOut(SColumn)
 return
 
+Edit_EnableZoom(hEdit,p_Enable:=True)
+{
+    Static ES_EX_ZOOMABLE:=0x10
+    Return Edit_SetExtendedStyle(hEdit,ES_EX_ZOOMABLE,p_Enable ? ES_EX_ZOOMABLE:0)
+}
+
+Edit_SetExtendedStyle(hEdit,p_Mask,p_ExStyle)
+{
+    Static Dummy69574821
+        ,S_OK:=0x0
+        ,EM_SETEXTENDEDSTYLE:=0x150A
+
+    SendMessage EM_SETEXTENDEDSTYLE,p_Mask,p_ExStyle,,ahk_id %hEdit%
+    Return ErrorLevel="FAIL" ? False:ErrorLevel=S_OK or ErrorLevel=0x10 ? True:False
+}
+
+Edit_GetZoom(hEdit,ByRef r_Numerator:="",ByRef r_Denominator:="",ByRef r_ZoomPct:="")
+{
+    Static EM_GETZOOM:=0x4E0
+
+    r_Numerator:=r_Denominator:=0
+    DllCall("SendMessage" . (A_IsUnicode ? "W":"A")
+        ,"UPtr",hEdit
+        ,"UInt",EM_GETZOOM
+        ,"UInt*",r_Numerator
+        ,"UInt*",r_Denominator)
+
+    r_ZoomPct:=r_Denominator ? Round((r_Numerator/r_Denominator)*100):0
+    Return {Numerator:r_Numerator,Denominator:r_Denominator,ZoomPct:r_ZoomPct}
+}
+
+Edit_ZoomIn(hEdit,p_IncrementPct:=10,p_MaxZoomPct:=9999)
+{
+    Static EM_SETZOOM:=0x4E1
+
+    Edit_GetZoom(hEdit,Numerator,Denominator,ZoomPct)
+    if (ZoomPct=0)
+        Return False
+
+    if (Numerator=Denominator)
+        Numerator:=Denominator:=100
+
+    Numerator:=Min(p_MaxZoomPct,Numerator+p_IncrementPct)
+
+    SendMessage EM_SETZOOM,Numerator,100,,ahk_id %hEdit%
+    Return ErrorLevel="FAIL" ? False:ErrorLevel
+}
+
+Edit_ZoomOut(hEdit,p_DecrementPct:=10,p_MinZoomPct:=10)
+{
+    Static EM_SETZOOM:=0x4E1
+
+    Edit_GetZoom(hEdit,Numerator,Denominator,ZoomPct)
+    if (ZoomPct=0)
+        Return False
+
+    if (Numerator=Denominator)
+        Numerator:=Denominator:=100
+
+    Numerator:=Max(p_MinZoomPct,Numerator-p_DecrementPct)
+
+    SendMessage EM_SETZOOM,Numerator,100,,ahk_id %hEdit%
+    Return ErrorLevel="FAIL" ? False:ErrorLevel
+}
+
+Edit_ZoomReset(hEdit)
+{
+    Static EM_SETZOOM:=0x4E1
+    SendMessage EM_SETZOOM,100,100,,ahk_id %hEdit%
+    Return ErrorLevel="FAIL" ? False:ErrorLevel
+}
+
 ; -------------------------------------------------------------------------------
 ; FONT [AUTHOR: maestrith]
 ; -------------------------------------------------------------------------------
-
 ; https://www.autohotkey.com/board/topic/94083-ahk-11-font-and-color-dialogs/
+; -------------------------------------------------------------------------------
+
 Font:
-    if !font:=Dlg_Font(name,style,hwnd) ;shows the user the font selection dialog
-        ;to get information from the style object use ( bold:=style.bold ) or ( underline:=style.underline )...
+    if !font:=Dlg_Font(name,style,hwnd)
         return
     Gui,font,% "c" RGB(style.color)
     GuiControl,font,InputText
@@ -1091,7 +1137,7 @@ Font:
     SendMessage,0x30,font,1,,ahk_id%Edit1%
     SendMessage,0x30,font,1,,ahk_id%SColumn%
 return
-;to get any of the style return values : value:=style.bold will get you the bold value and so on
+
 Dlg_Font(ByRef Name,ByRef Style,hwnd="",effects=1){
     static logfont
     VarSetCapacity(logfont,60),LogPixels:=DllCall("GetDeviceCaps","uint",DllCall("GetDC","uint",0),"uint",90),Effects:=0x041+(Effects?0x100:0)
@@ -1123,10 +1169,10 @@ rgb(c){
 }
 
 ; -------------------------------------------------------------------------------
-; GETFONT [AUTHOR: teadrinker]
+; GET FONT [AUTHOR: teadrinker]
 ; -------------------------------------------------------------------------------
-
 ; https://www.autohotkey.com/boards/viewtopic.php?t=161
+; -------------------------------------------------------------------------------
 
 GetFont(hWnd) {
     static WM_GETFONT := 0x31
@@ -1156,32 +1202,26 @@ GetFont(hWnd) {
 }
 
 ; -------------------------------------------------------------------------------
-; ZOOMFONT (Provides zooming to users that are not on Win10)
+; ZOOM IN\OUT [Win7 and lower]
 ; -------------------------------------------------------------------------------
 
 ZoomFont(Control, Direction) {
-    static FontData := {} ; Store font info for all controls
-
-    ; Get control handle and current font info
+    static FontData := {}
     GuiControlGet, hControl, HWND, %Control%
-    fontInfo := GetFont(hControl) ; Using your GetFont() function
+    fontInfo := GetFont(hControl)
 
-    ; If font name changed, reset stored data
     if (FontData.HasKey(Control) && FontData[Control].Name != fontInfo.FaceName) {
-        FontData.Delete(Control)  ; Clear old data
+        FontData.Delete(Control)
     }
 
-    ; Initialize static variables if they don't exist
     if !FontData.HasKey(Control) {
         FontData[Control] := {Name: fontInfo.FaceName, Size: fontInfo.Size}
     }
 
-    ; Update the size based on direction
     newSize := FontData[Control].Size + Direction
     newSize := newSize < 6 ? 6 : newSize > 72 ? 72 : newSize
     FontData[Control].Size := newSize
 
-    ; Reapply font with new size but original face
     Gui, Font, s%newSize%, % FontData[Control].Name
     GuiControl, Font, %Control%
 }
@@ -1189,80 +1229,61 @@ ZoomFont(Control, Direction) {
 ; -------------------------------------------------------------------------------
 ; CHANGE HISTORY
 ; -------------------------------------------------------------------------------
+; ALTERNATIVE FOR V2: https://www.autohotkey.com/boards/viewtopic.php?t=132062
+; -------------------------------------------------------------------------------
 
 SaveValue:
     Gui, Submit, NoHide
     if (InputText != "" || InputText = "") {
-        CaretIndex := Edit_GetCaretIndex(Edit) ; Get current caret index
-        SavedValues.Push(InputText)             ; Save the input text
-        CaretIndices.Push(CaretIndex)           ; Save the caret index
-        CurrentIndex := SavedValues.Length()     ; Update current index
+        CaretIndex := Edit_GetCaretIndex(Edit)
+        SavedValues.Push(InputText)
+        CaretIndices.Push(CaretIndex)
+        CurrentIndex := SavedValues.Length()
     }
 return
 
-; Navigate to the previous saved value
 PreviousValue:
     GuiControl, Focus, InputText
     if (SavedValues.Length() > 0 && CurrentIndex > 1) {
         CurrentIndex--
         GuiControl,, InputText, % SavedValues[CurrentIndex]
-        Edit_SetCaretIndex(Edit, CaretIndices[CurrentIndex]) ; Restore caret index
+        Edit_SetCaretIndex(Edit, CaretIndices[CurrentIndex])
     }
 return
 
-; Navigate to the next saved value
 NextValue:
     GuiControl, Focus, InputText
     if (SavedValues.Length() > 0 && CurrentIndex < SavedValues.Length()) {
         CurrentIndex++
         GuiControl,, InputText, % SavedValues[CurrentIndex]
-        Edit_SetCaretIndex(Edit, CaretIndices[CurrentIndex]) ; Restore caret index
+        Edit_SetCaretIndex(Edit, CaretIndices[CurrentIndex])
     }
 return
 
 ; -------------------------------------------------------------------------------
-; CARET HANDLE [AUTHOR: jballi]
+; CARET [AUTHOR: jballi]
+; -------------------------------------------------------------------------------
+; https://www.autohotkey.com/boards/viewtopic.php?f=6&t=5063
 ; -------------------------------------------------------------------------------
 
 Edit_GetCaretIndex(hEdit)
 {
-    Static EM_GETCARETINDEX:=0x1512  ;-- ECM_FIRST+18
+    Static EM_GETCARETINDEX:=0x1512
     SendMessage EM_GETCARETINDEX,0,0,,ahk_id %hEdit%
     Return ErrorLevel="FAIL" ? False:ErrorLevel
 }
 
 Edit_SetCaretIndex(hEdit,p_CaretIndex)
 {
-    Static EM_SETCARETINDEX:=0x1511  ;-- ECM_FIRST+17
+    Static EM_SETCARETINDEX:=0x1511
     SendMessage EM_SETCARETINDEX,p_CaretIndex,0,,ahk_id %hEdit%
     Return ErrorLevel:="FAIL" ? False:True
 }
 
 ; -------------------------------------------------------------------------------
-; HELP TOOLTIP TOGGLE
+; GUI CONTROL TOOLTIP [AUTHOR: just me]
 ; -------------------------------------------------------------------------------
-
-HelpTooltips:
-    global InlineTooltip
-    if (InlineTooltip = 0) {
-        Menu, HelpMenu, Check, Tooltips
-        InlineTooltip := 1
-        Help.Suspend(False)
-        Tooltip, Inline help is enabled. Hovering over certain`ncontrols will display Help Tooltips.
-        SetTimer, RemoveToolTip, -4000
-    }
-    else {
-
-        Menu, HelpMenu, Uncheck, Tooltips
-        InlineTooltip := 0
-        Help.Suspend(True)
-        Tooltip, Inline help is disabled. Help Tooltips`nwont be shown.
-        SetTimer, RemoveToolTip, -3000
-    }
-return
-
-; -------------------------------------------------------------------------------
-; HELP TOOLTIP HANDLE [AUTHOR: just me]
+; https://www.autohotkey.com/boards/viewtopic.php?t=2598
 ; -------------------------------------------------------------------------------
 
 Class GuiControlTips {
@@ -1277,7 +1298,7 @@ Class GuiControlTips {
         Static TTM_SETMAXTIPWIDTH := 0x0418
         Static TTM_SETMARGIN      := 0x041A
         Static WS_EX_TOPMOST      := 0x00000008
-        Static WS_STYLES          := 0x80000002 ; WS_POPUP | TTS_NOPREFIX
+        Static WS_STYLES          := 0x80000002
 
         HTIP := DllCall("User32.dll\CreateWindowEx", "UInt", WS_EX_TOPMOST, "Str", CLASS_TOOLTIP, "Ptr", 0
             , "UInt", WS_STYLES
@@ -1325,7 +1346,7 @@ Class GuiControlTips {
     }
 
     Attach(HCTRL, TipText, CenterTip = False) {
-        Static TTM_ADDTOOL  := A_IsUnicode ? 0x0432 : 0x0404 ; TTM_ADDTOOLW : TTM_ADDTOOLA
+        Static TTM_ADDTOOL  := A_IsUnicode ? 0x0432 : 0x0404
         If !(This.HTIP) {
             Return False
         }
@@ -1361,149 +1382,45 @@ Class GuiControlTips {
 }
 
 ; -------------------------------------------------------------------------------
+; ----------------------------- GUI FORMAT LABELS -------------------------------
+; -------------------------------------------------------------------------------
+
+; -------------------------------------------------------------------------------
 ; FIND
 ; -------------------------------------------------------------------------------
 
 FindButton:
     Gui, Submit, NoHide
     if (StrLen(SearchTextGlobal) > 0) {
-        ; Get the handle of the edit control
         GuiControlGet, InputTextHwnd, Hwnd, InputText
-
-        ; Start position logic
         StartPos := (LastFoundPos = 0) ? 1 : LastFoundPos + StrLen(SearchTextGlobal)
 
-        ; Prepare search parameters
-        SearchOptions := ""
-        if (IgnoreCaseFind)
-            SearchOptions .= "i"
-
-        if (RegexEnabled) {
-            ; Regex Search
-            try {
-                if (WholeWordFind)
-                    SearchTextGlobal := "\b" . SearchTextGlobal . "\b"
-
-                FoundPos := RegExMatch(InputText, SearchOptions . ")" . SearchTextGlobal, Match, StartPos)
-
-                if (FoundPos > 0) {
-                    ; Calculate actual position considering line breaks
-                    ActualPos := 0
-                    NewlineCount := 0
-                    Loop, % FoundPos - 1 {
-                        if (SubStr(InputText, A_Index, 1) == "`n")
-                            NewlineCount++
-                    }
-
-                    ; Account for newlines in the selection position
-                    ActualPos := FoundPos + NewlineCount
-
-                    ; Select the found text
-                    SendMessage, 0xB1, ActualPos - 1, ActualPos - 1 + StrLen(Match), , ahk_id %InputTextHwnd%
-
-                    ; Scroll and focus
-                    SendMessage, 0xB7, 0, 0, , ahk_id %InputTextHwnd%
-                    ControlFocus, , ahk_id %InputTextHwnd%
-
-                    LastFoundPos := FoundPos
-                } else {
-                    ; If not found from current position, wrap around
-                    FoundPos := RegExMatch(InputText, SearchOptions . ")" . SearchTextGlobal, Match)
-
-                    if (FoundPos > 0) {
-                        ; Calculate actual position considering line breaks
-                        ActualPos := 0
-                        NewlineCount := 0
-                        Loop, % FoundPos - 1 {
-                            if (SubStr(InputText, A_Index, 1) == "`n")
-                                NewlineCount++
-                        }
-
-                        ; Account for newlines in the selection position
-                        ActualPos := FoundPos + NewlineCount
-
-                        SendMessage, 0xB1, ActualPos - 1, ActualPos - 1 + StrLen(Match), , ahk_id %InputTextHwnd%
-                        SendMessage, 0xB7, 0, 0, , ahk_id %InputTextHwnd%
-                        ControlFocus, , ahk_id %InputTextHwnd%
-
-                        LastFoundPos := 0
-                    } else {
-                        MsgBox, Text not found!
-                        LastFoundPos := 0
-                    }
-                }
-            } catch e {
-                MsgBox, Invalid Regex Pattern: %e%
-                LastFoundPos := 0
-            }
-        } else {
-            ; Original non-regex search
-            ; Normalize text by removing or replacing newlines for the search
-            NormalizedText := StrReplace(InputText, "`r`n", " ")
-
-            ; Normalize case if 'IgnoreCaseFind' is checked
-            if (IgnoreCaseFind) {
-                StringLower, NormalizedText, NormalizedText
-                StringLower, SearchTextGlobal, SearchTextGlobal
-            }
-
-            ; Determine if whole word matching is needed
-            if (WholeWordFind) {
-                ; Use RegEx to find whole words
-                SearchPattern := "\b" . RegExEscape(SearchTextGlobal) . "\b"
-                FoundPos := RegExMatch(NormalizedText, SearchPattern, Match, StartPos)
-            } else {
-                ; Use InStr for normal search
-                FoundPos := InStr(NormalizedText, SearchTextGlobal, 0, StartPos)
-            }
-
-            ; If not found from current position, wrap around to beginning
-            if (FoundPos = 0 && LastFoundPos != 0) {
-                if (WholeWordFind) {
-                    FoundPos := RegExMatch(NormalizedText, SearchPattern, Match)
-                } else {
-                    FoundPos := InStr(NormalizedText, SearchTextGlobal, 0)
-                }
-                LastFoundPos := 0  ; Reset for next search
-            }
+        try {
+            FoundPos := Set_FindText(InputText, SearchTextGlobal, IgnoreCaseFind, WholeWordFind, RegexEnabled, LastFoundPos)
 
             if (FoundPos > 0) {
-                ; We now need to calculate the actual position in the original text, considering line breaks.
                 ActualPos := 0
-                ; Count how many newlines precede the matched text
                 NewlineCount := 0
                 Loop, % FoundPos - 1 {
                     if (SubStr(InputText, A_Index, 1) == "`n")
                         NewlineCount++
                 }
 
-                ; Account for newlines in the selection position
                 ActualPos := FoundPos + NewlineCount
-
-                ; Select/Highlight the found text in the original position
                 SendMessage, 0xB1, ActualPos - 1, ActualPos - 1 + StrLen(SearchTextGlobal), , ahk_id %InputTextHwnd%
-
-                ; Scroll to make the selection visible
-                SendMessage, 0xB7, 0, 0, , ahk_id %InputTextHwnd%  ; EM_SCROLLCARET
-
-                ; Focus the control to make selection visible
+                SendMessage, 0xB7, 0, 0, , ahk_id %InputTextHwnd%
                 ControlFocus, , ahk_id %InputTextHwnd%
-
-                ; Update LastFoundPos for next search
-                LastFoundPos := FoundPos
             } else {
                 ToolTip, Text not found!
-                SetTimer, RemoveToolTip, -1000
-                LastFoundPos := 0  ; Reset for next search
+                SetTimer, RemoveToolTipRealm, -1000
+                LastFoundPos := 0
             }
+        } catch e {
+            MsgBox, % e.message
+            LastFoundPos := 0
         }
     }
 return
-
-; Function to escape special regex characters
-RegExEscape(str) {
-    return RegExReplace(str, "([\[\]\(\)\{\}\.\*\+\?\^\$\\\|])", "\\\$1")
-}
 
 ; -------------------------------------------------------------------------------
 ; SEARCH AND REPLACE
@@ -1512,40 +1429,8 @@ RegExEscape(str) {
 ReplaceText:
     Gui, Submit, NoHide
 
-    input := InputText
-    search := SearchText
-    replace := ReplaceText
+    OutputText := Set_TextReplace(InputText, SearchText, ReplaceText, CaseSensitive, WholeWord, RegexMode)
 
-caseSensitive := !CaseSensitive
-
-    ; Escape special regex characters if not in regex mode
-    if (!RegexMode) {
-        escapedSearch := ""
-        Loop, Parse, search
-        {
-            if A_LoopField ~= "[\.\*\+\?\^\$\{\}\(\)\|\[\]\\]"
-                escapedSearch .= "\" . A_LoopField
-            else
-                escapedSearch .= A_LoopField
-        }
-        search := escapedSearch
-    }
-
-    ; Whole word handling
-    if (WholeWord) {
-        regex := "\b" . search . "\b"
-    } else {
-        regex := search
-    }
-
-    ; Perform replacement
-    if (caseSensitive) {
-        output := RegExReplace(input, regex, replace)
-    } else {
-        output := RegExReplace(input, "(?i)" . regex, replace)
-    }
-
-    OutputText := output
     GuiControl,, OutputText, %OutputText%
     if (AutoInput == 1) {
         Gosub, CopyToInput
@@ -1559,39 +1444,53 @@ return
 
 AddSuffixPrefix:
     Gui, Submit, NoHide
-    text := InputText
-    result := ""
-    PrefixBasic := StrReplace(PrefixBasic, " ", Chr(160))
-    SuffixBasic := StrReplace(SuffixBasic, " ", Chr(160))
 
-    Loop, Parse, text, `n, `r
-    {
-        line := A_LoopField
-        trimmedLine := Trim(line)
+    OutputText := Set_TextAffix(InputText, PrefixBasic, SuffixBasic, ExcludeEmpty, ExcludeBlank, DeleteEmpty, DeleteBlank)
 
-        ; Existing functionality
-        if (DeleteEmpty && line = "")
-            continue
-
-        if (DeleteBlank && RegExMatch(line, "^\s+$"))
-            continue
-
-        ; New option to exclude blank lines from prefix/suffix
-        if (ExcludeBlank && RegExMatch(line, "^\s+$"))
-        {
-            result .= line . "`n"
-            continue
-        }
-
-        if (!ExcludeEmpty || line != "")
-            line := PrefixBasic . line . SuffixBasic
-
-        result .= line . "`n"
+    GuiControl, , OutputText, %OutputText%
+    if (AutoInput == 1) {
+        Gosub, CopyToInput
     }
+    Gosub, UpdateStats
+return
 
-    result := RTrim(result, "`n`r")
+; -------------------------------------------------------------------------------
+; ENCLOSE
+; -------------------------------------------------------------------------------
 
-    GuiControl, , OutputText, %result%
+EncloseTypeChanged:
+    Gui, Submit, NoHide
+    Enclosures := {"Guillemets":    [Chr(0x00AB), Chr(0x00BB)]
+        , "Double":                 [Chr(0x0022), Chr(0x0022)]
+        , "Single":                 [Chr(0x0027), Chr(0x0027)]
+        , "DoubleSmart":            [Chr(0x201C), Chr(0x201D)]
+        , "SingleSmart":            [Chr(0x2018), Chr(0x2019)]}
+
+    if (EncloseType = "Custom") {
+        GuiControl, Enable, EncloseLeft
+        GuiControl, Enable, EncloseRight
+        GuiControl,, EncloseLeft
+        GuiControl,, EncloseRight
+    } else {
+        leftChar := Enclosures[EncloseType][1]
+        rightChar := Enclosures[EncloseType][2]
+        GuiControl, Disable, EncloseLeft
+        GuiControl, Disable, EncloseRight
+        GuiControl,, EncloseLeft, %leftChar%
+        GuiControl,, EncloseRight, %rightChar%
+    }
+return
+
+EncloseText:
+    Gui, Submit, NoHide
+
+    GuiControlGet, encloseType, , EncloseType
+    GuiControlGet, encloseLeft, , EncloseLeft
+    GuiControlGet, encloseRight, , EncloseRight
+
+    OutputText := Set_TextEnclose(InputText, encloseType, encloseLeft, encloseRight)
+
+    GuiControl,, OutputText, %OutputText%
     if (AutoInput == 1) {
         Gosub, CopyToInput
     }
@@ -1604,55 +1503,10 @@ return
 
 RemoveSpaces:
     Gui, Submit, NoHide
-    text := InputText
 
-    if (TrimStart) {
-        Loop, Parse, text, `n
-        {
-            Line := A_LoopField
-            Line := LTrim(Line)
-            Result .= Line . "`n"
-        }
-        text := Result
-        Result := ""
-    }
+    OutputText := Set_TextSpaces(InputText, TrimStart, TrimEnd, RemoveExtra, TrimAbove, TrimBelow, RemoveExtraWholeText, RemoveAllSpaces)
 
-    if (TrimEnd) {
-        Loop, Parse, text, `n
-        {
-            Line := A_LoopField
-            Line := RTrim(Line)
-            Result .= Line . "`n"
-        }
-        text := Result
-        Result := ""
-    }
-
-    if (RemoveExtra) {
-        Loop, Parse, text, `n
-        {
-            Line := A_LoopField
-            Line := RegExReplace(Line, "(\S)\s+(\S)", "$1 $2")
-            Result .= Line . "`n"
-        }
-        text := Result
-        Result := ""
-    }
-
-    if (TrimAbove)
-        text := RegExReplace(text, "^\s+", "")
-    if (TrimBelow)
-        text := RegExReplace(text, "\s+$", "")
-    if (RemoveExtraWholeText)
-        text := RegExReplace(text, "[ \t]+", " ")
-
-    if (RemoveAllSpaces) {
-        text := RegExReplace(text, "[ \t]+", "")
-    }
-
-    ; text := RTrim(text, "`n`r")
-
-    GuiControl, , OutputText, %text%
+    GuiControl, , OutputText, %OutputText%
     if (AutoInput == 1) {
         Gosub, CopyToInput
     }
@@ -1665,166 +1519,25 @@ return
 
 LineBreaksBasic:
     Gui, Submit, NoHide
-    ; Get the text from input
     GuiControlGet, text,, InputText
 
-    ; First, normalize all line breaks to single newlines
-    text := RegExReplace(text, "\r\n|\r|\n", "`n")
-
-    ; Process according to selected option
     if (LineBreakOption1)
-    {
-        ; Remove all line breaks
-        text := RegExReplace(text, "\s*\n\s*", "")
-    }
+        OutputText := Set_LineBreaksBasic(text, "RemoveAll")
     else if (LineBreakOption5)
-    {
-        ; Remove all line breaks
-        text := RegExReplace(text, "\s*\n\s*", " ")
-    }
+        OutputText := Set_LineBreaksBasic(text, "JoinAll")
     else if (LineBreakOption2)
-    {
-        ; Custom number of line breaks
-        numBreaks := CustomBreaksUpDown
-
-        ; First normalize to single breaks
-        text := RegExReplace(text, "\s*\n\s*", "`n")
-        text := RegExReplace(text, "\n+", "`n")
-
-        ; Then replace with custom number
-        breaks := RepeatStr("`n", numBreaks)
-        text := RegExReplace(text, "\n", breaks)
-    }
+        OutputText := Set_LineBreaksBasic(text, "Keep", CustomBreaksUpDown)
     else if (LineBreakOption3)
-    {
-        ; Retrieve source text and line break count
-        LineBreakCount := LineBreakCountUpDown
-
-        ; Validate line break count (default to 1 if invalid)
-        if (LineBreakCount = "" || LineBreakCount < 0)
-            LineBreakCount := 1
-
-        ; Split the text into lines
-        lines := StrSplit(text, "`n")
-        result := ""
-
-        ; Process each line
-        for index, line in lines {
-            ; Skip adding extra line breaks for empty lines or "/n"
-            if (Trim(line) != "" && Trim(line) != "/n") {
-                ; Add specified number of line breaks
-                Loop, %LineBreakCount%
-                {
-                    result .= "`n"
-                }
-                result .= line
-            } else {
-                result .= line
-            }
-
-            ; Add a final newline unless it's the last line
-            if (index < lines.Length())
-                result .= "`n"
-        }
-
-        ; Remove leading/trailing whitespace
-        result := result, "`n" ; Use result := Trim(result, "`n") to exclude adding of line breaks before text
-
-        text := result
-    }
+        OutputText := Set_LineBreaksBasic(text, "Add", , LineBreakCountUpDown)
     else if (LineBreakOption4)
-    {
-        ; Validate auto process count
-        AutoProcessCount := AutoProcessCountUpDown
-        if (AutoProcessCount < 1)
-            AutoProcessCount := 1
+        OutputText := Set_LineBreaksBasic(text, "Remove", , , AutoProcessCountUpDown)
 
-        ; Store original text
-        originalText := text
-
-        ; Repeat processing specified number of times
-        Loop, %AutoProcessCount%
-        {
-            ; Split the text into lines
-            lines := StrSplit(text, "`n", "`r")
-
-            ; Combine lines
-            combinedLines := []
-            currentLine := ""
-
-            for index, line in lines {
-                trimmedLine := Trim(line)
-
-                ; If line is not empty
-                if (trimmedLine != "") {
-                    ; If current line is empty, start a new line
-                    if (currentLine == "") {
-                        currentLine := trimmedLine
-                    } else {
-                        ; Append to current line with a space
-                        currentLine .= "" . trimmedLine
-                    }
-                } else {
-                    ; Empty line means end of paragraph
-                    if (currentLine != "") {
-                        combinedLines.Push(currentLine)
-                        currentLine := ""
-                    }
-                    ; Push empty line to preserve paragraph breaks
-                    combinedLines.Push("")
-                }
-            }
-
-            ; Add last line if not empty
-            if (currentLine != "") {
-                combinedLines.Push(currentLine)
-            }
-
-            ; Process combined lines
-            processedLines := []
-            i := 1
-            while (i <= combinedLines.Length()) {
-                ; If current line is not empty
-                if (Trim(combinedLines[i]) != "") {
-                    processedLines.Push(combinedLines[i])
-
-                    ; If next line is empty, skip it
-                    if (i + 1 <= combinedLines.Length() && Trim(combinedLines[i+1]) == "") {
-                        i++
-                    }
-                } else {
-                    ; Keep other empty lines
-                    processedLines.Push(combinedLines[i])
-                }
-
-                i++
-            }
-
-            ; Join processed lines
-            text := ""
-            for index, line in processedLines {
-                text .= line . "`n"
-            }
-
-            ; Remove trailing newline
-            text := RegExReplace(text, "^(\n){" . AutoProcessCount . "}", "") ; Use text := RTrim(text, "`n") to exclude removing of line breaks before text
-        }
-    }
-
-    ; Update output field
-    GuiControl,, OutputText, %text%
+    GuiControl,, OutputText, %OutputText%
     if (AutoInput == 1) {
         Gosub, CopyToInput
     }
     Gosub, UpdateStats
 return
-
-RepeatStr(str, count) {
-    result := ""
-    Loop, %count%
-        result .= str
-    return result
-}
 
 ; -------------------------------------------------------------------------------
 ; LINE BREAKS EXTENDED
@@ -1832,59 +1545,43 @@ RepeatStr(str, count) {
 
 LineBreaksExtended:
     Gui, Submit, NoHide
-    text := InputText
-    symbol := Symbol
-    numCharacters := NumCharactersUpDown
-    insensitive := CaseInsensitive
-    wholeWordLineBreaks := WholeWordLineBreaks
-    regexSymbol := symbol
 
-    if (insensitive) {
-        regexSymbol := "(?i)" . symbol
-    } else {
-        regexSymbol := symbol
-    }
+    if (Option4)
+        OutputText := Set_LineBreaksExtended(InputText, "Replace", Symbol)
+    else if (Option1)
+        OutputText := Set_LineBreaksExtended(InputText, "Before", Symbol, , CaseInsensitive, wholeWordLineBreaks)
+    else if (Option2)
+        OutputText := Set_LineBreaksExtended(InputText, "Instead", Symbol, , CaseInsensitive, wholeWordLineBreaks)
+    else if (Option3)
+        OutputText := Set_LineBreaksExtended(InputText, "After", Symbol, , CaseInsensitive, wholeWordLineBreaks)
+    else if (Option5)
+        OutputText := Set_LineBreaksExtended(InputText, "Every", , NumCharactersUpDown)
 
-    if (wholeWordLineBreaks) {
-        regexSymbol := "\b" . regexSymbol . "\b"
-    }
-
-    if (Option4) {
-        result := RegExReplace(text, "`n", symbol)
-    } else if (Option1) {
-        result := RegExReplace(text, "(" . regexSymbol . ")", "`n$1")
-    } else if (Option2) {
-        result := RegExReplace(text, "(" . regexSymbol . ")", "`n")
-    } else if (Option3) {
-        result := RegExReplace(text, "(" . regexSymbol . ")", "$1`n")
-    } else if (Option5) {
-        if (numCharacters > 0) {
-            result := ""
-            charCount := 0
-            Loop, Parse, text
-            {
-                charCount++
-                result .= A_LoopField
-                if (charCount >= numCharacters) {
-                    result .= "`n"
-                    charCount := 0
-                }
-            }
-        } else {
-            MsgBox, 16, Error, Please enter a valid number of characters.
-        }
-    }
-
-    GuiControl,, OutputText, % result
+    GuiControl,, OutputText, % OutputText
     if (AutoInput == 1) {
         Gosub, CopyToInput
     }
     Gosub, UpdateStats
-
 return
 
 ; -------------------------------------------------------------------------------
 ; DELETION
+; -------------------------------------------------------------------------------
+
+DellActionButton:
+    Gui, Submit, NoHide
+
+    OutputText := Set_TextDelete(InputText, ActionType, DeletionEditField1, DeletionEditField2, IsLineContext, RemoveSymbol, CaseInsensitiveDel, WholeWordsOnlyDel)
+
+    GuiControl,, OutputText, %OutputText%
+    if (AutoInput == 1) {
+        Gosub, CopyToInput
+    }
+    Gosub, UpdateStats
+Return
+
+; -------------------------------------------------------------------------------
+; DELETION DDL CHANGE HANDLER
 ; -------------------------------------------------------------------------------
 
 ActionTypeChanged:
@@ -1926,30 +1623,952 @@ ActionTypeChanged:
     }
 return
 
-DellActionButton:
+; -------------------------------------------------------------------------------
+; DUPLICATE LINES
+; -------------------------------------------------------------------------------
+
+RemoveDuplicates:
     Gui, Submit, NoHide
 
-    Switch ActionType
-    {
-    Case "Delete Containing":
-        Result := RemoveLines(InputText, DeletionEditField1, CaseInsensitiveDel, WholeWordsOnlyDel)
+    OutputText := Set_RemoveDuplicates(InputText, IgnoreCase, TrimSpaces, KeepDuplicates, DeleteFirstDuplicate)
 
-    Case "Delete NOT Containing":
-        Result := RemoveNotLines(InputText, DeletionEditField2, CaseInsensitiveDel, WholeWordsOnlyDel)
+    GuiControl,, OutputText, %OutputText%
+    if (AutoInput == 1) {
+        Gosub, CopyToInput
+    }
+    Gosub, UpdateStats
+return
 
-    Case "Delete Before and After":
-        Result := DeleteBeforeAfter(InputText, DeletionEditField1, DeletionEditField2, IsLineContext, RemoveSymbol, CaseInsensitiveDel, WholeWordsOnlyDel)
+; -------------------------------------------------------------------------------
+; EMPTY AND BLANK LINES REMOVAL
+; -------------------------------------------------------------------------------
 
-    Case "Delete Block":
-        Result := DeleteBlock(inputText, DeletionEditField1, DeletionEditField2, isLineContext, removeSymbol, CaseInsensitiveDel, WholeWordsOnlyDel)
+DeleteEmptyBlankLines:
+    Gui, Submit, NoHide
+
+    if (DeleteOnlyEmptyLines) {
+        OutputText := Set_RemoveEmptyLines(InputText, "Empty")
+    } else if (DeleteBothEmptyBlankLines) {
+        OutputText := Set_RemoveEmptyLines(InputText, "Both")
+    } else if (DeleteOnlyBlankLines) {
+        OutputText := Set_RemoveEmptyLines(InputText, "Blank")
     }
 
-    GuiControl,, OutputText, %Result%
+    GuiControl,, OutputText, %OutputText%
+    if (AutoInput == 1) {
+        Gosub, CopyToInput
+    }
+    Gosub, UpdateStats
+return
+
+; -------------------------------------------------------------------------------
+; SPECIAL CHARACTER REMOVAL
+; -------------------------------------------------------------------------------
+
+RemoveChars:
+    Gui, Submit, NoHide
+
+    OutputText := Set_RemoveChars(InputText, RemoveCharsField)
+
+    GuiControl,, OutputText, %OutputText%
+    if (AutoInput == 1) {
+        Gosub, CopyToInput
+    }
+    Gosub, UpdateStats
+return
+
+; -------------------------------------------------------------------------------
+; NUMBERING
+; -------------------------------------------------------------------------------
+
+NumberingMode1:
+    GuiControl, Disable, Uppercase
+    GuiControl, Enable, LeadingZeros
+    Gosub, StartChar
+return
+
+NumberingMode2:
+NumberingMode3:
+    GuiControl, Enable, Uppercase
+    GuiControl, Disable, LeadingZeros
+    Gosub, StartChar
+return
+
+StartChar:
+    Gui, Submit, NoHide
+    if (NumberingMode3) {
+        GuiControlGet, CurrentText,, StartChar
+        CleanedText := RegExReplace(CurrentText, "[0-9]", "")
+        if (CurrentText != CleanedText) {
+            Tooltip, Only letters are allowed.
+            SetTimer, RemoveToolTipRealm, -1500
+        }
+    } else if (NumberingMode1 || NumberingMode2) {
+        GuiControlGet, CurrentText,, StartChar
+        CleanedText := RegExReplace(CurrentText, "[^0-9]", "")
+        if (CurrentText != CleanedText) {
+            Tooltip, Only digits are allowed.
+            SetTimer, RemoveToolTipRealm, -1500
+        }
+    }
+    if (CurrentText != CleanedText) {
+        GuiControl,, StartChar, %CleanedText%
+        SendInput, {End}
+    }
+return
+
+NumberText:
+    Gui, Submit, NoHide
+
+    if (NumberingMode1)
+        mode := "Numbers"
+    else if (NumberingMode2)
+        mode := "Roman Numerals"
+    else if (NumberingMode3)
+        mode := "Letters"
+
+    OutputText := Set_TextNumbering(InputText, mode, StartChar, Prefix, Suffix, ExcludeBlankLines, ExcludeEmptyLines, DeleteEmptyLines, DeleteBlankLines, DeleteStartNumbers, Uppercase, AddDot, LeadingZeros)
+
+    GuiControl,, OutputText, %OutputText%
+    if (AutoInput == 1) {
+        Gosub, CopyToInput
+    }
+    Gosub, UpdateStats
+return
+
+; -------------------------------------------------------------------------------
+; SORTING
+; -------------------------------------------------------------------------------
+
+Alph:
+LineLength:
+    GuiControl, Enable, ReverseSorting
+    GuiControl, Enable, ConsiderCaseSorting
+return
+
+Natural:
+    GuiControl, Enable, ReverseSorting
+    GuiControl, Disable, ConsiderCaseSorting
+return
+
+Flip:
+    GuiControl, Disable, ReverseSorting
+    GuiControl, Disable, ConsiderCaseSorting
+return
+
+SortStrings:
+    Gui, Submit, NoHide
+
+    if (Alph)
+        sortType := "Alphabetical"
+    else if (Flip)
+        sortType := "Upside Down"
+    else if (LineLength)
+        sortType := "Line Length"
+    else if (Natural)
+        sortType := "Natural"
+
+    OutputText := Set_TextSort(InputText, sortType, ReverseSorting, ConsiderCaseSorting)
+
+    GuiControl,, OutputText, %OutputText%
+    if (AutoInput == 1) {
+        Gosub, CopyToInput
+    }
+    Gosub, UpdateStats
+return
+
+; -------------------------------------------------------------------------------
+; CASE CHANGING
+; -------------------------------------------------------------------------------
+
+ConvertText:
+    Gui, Submit, NoHide
+
+    if (CaseUpper)
+    caseType := "U"
+    else if (CaseLower)
+    caseType := "L"
+    else if (CaseTitled)
+    caseType := "T"
+    else if (CaseSentence)
+    caseType := "S"
+    else if (CaseInvert)
+    caseType := "I"
+
+    OutputText := Set_TextCase(InputText, caseType)
+
+    GuiControl,, OutputText, %OutputText%
+    if (AutoInput == 1) {
+        Gosub, CopyToInput
+    }
+    Gosub, UpdateStats
+return
+
+; -------------------------------------------------------------------------------
+; ALIGNING
+; -------------------------------------------------------------------------------
+
+Allign:
+    Gui, Submit, NoHide
+
+    if (Left)
+        alignType := "Left"
+    else if (Center)
+        alignType := "Center"
+    else if (Right)
+        alignType := "Right"
+
+    OutputText := Set_TextAlign(InputText, LineLengthAlligning, alignType, FillChar)
+
+    GuiControl,, OutputText, %OutputText%
+    if (AutoInput == 1) {
+        Gosub, CopyToInput
+    }
+    Gosub, UpdateStats
+return
+
+; -------------------------------------------------------------------------------
+; PADDING
+; -------------------------------------------------------------------------------
+
+AddPadding:
+    Gui, Submit, NoHide
+
+    if (PadBoth)
+        padType := "Both"
+    else if (PadLeft)
+        padType := "Left"
+    else if (PadRight)
+        padType := "Right"
+
+    OutputText := Set_TextPadding(InputText, PaddingSize, PaddingChar, padType)
+
+    GuiControl,, OutputText, %OutputText%
     if (AutoInput == 1) {
         Gosub, CopyToInput
     }
     Gosub, UpdateStats
 Return
+
+; -------------------------------------------------------------------------------
+; LINE REPEAT
+; -------------------------------------------------------------------------------
+
+RepeatText:
+    Gui, Submit, NoHide
+
+    if (LineModeAll)
+        lineMode := "All"
+    else if (LineModeSpecific)
+        lineMode := "Specific"
+
+    if (RepeatModeNewLine)
+        repeatMode := "NewLine"
+    else if (RepeatModeSingleLine)
+        repeatMode := "SingleLine"
+
+    OutputText := Set_TextRepeat(InputText, RepeatCount, lineMode, SpecificLines, SeparatorText, repeatMode)
+
+    GuiControl,, OutputText, %OutputText%
+    if (AutoInput == 1) {
+        Gosub, CopyToInput
+    }
+    Gosub, UpdateStats
+return
+
+; -------------------------------------------------------------------------------
+; CONCATENATE
+; -------------------------------------------------------------------------------
+
+ConcatenateColumns:
+    Gui, Submit, NoHide
+
+    OutputText := Set_ConcatenateColumns(InputText, SecondColumn, ColumnSeparator)
+
+    GuiControl,, OutputText, % OutputText
+Return
+
+; -------------------------------------------------------------------------------
+; DATE AND TIME
+; -------------------------------------------------------------------------------
+
+InsertDateTime() {
+    FormatTime, CurrentDateTime,, hh:mm tt dd/MM/yyyy
+    SendInput, %CurrentDateTime%
+}
+
+; -------------------------------------------------------------------------------
+; EDIT ACTIONS
+; -------------------------------------------------------------------------------
+
+Copy() {
+    Send, ^c
+    return
+}
+
+Paste() {
+    Send, ^v
+    return
+}
+
+SelectAll() {
+    Send, ^a
+    return
+}
+
+Cut() {
+    Send, ^x
+    return
+}
+
+Undo() {
+    Gosub, PreviousValue
+}
+
+Redo() {
+    Gosub, NextValue
+}
+
+; -------------------------------------------------------------------------------
+; RELOAD
+; -------------------------------------------------------------------------------
+
+ReloadRealm() {
+    Reload
+}
+
+; -------------------------------------------------------------------------------
+; ---------------------------------- HOTKEYS ------------------------------------
+; -------------------------------------------------------------------------------
+
+#IfWinActive, Realm
+    Ctrl & MButton::
+        Edit_ZoomReset(Edit)
+        Edit_ZoomReset(Edit1)
+    Return
+#IfWinActive
+
+#IfWinActive, Realm
+    F5::
+        InsertDateTime()
+    return
+#IfWinActive
+
+#IfWinActive, Realm
+    Esc::
+        WinClose, A
+    return
+#IfWinActive
+
+#IfWinActive, Realm
+    ~LButton Up::
+        UpdateStatusBar(control)
+    return
+#IfWinActive
+
+#IfWinActive, Realm
+    ~^a::
+    ~+Left::
+    ~+Right::
+    ~^+Left::
+    ~^+Right::
+    ~+Home::
+    ~+^Home::
+    ~+End::
+    ~+^End::
+    ~Left::
+    ~Right::
+    ~Up::
+    ~Down::
+        Sleep, 100
+        UpdateStatusBar(control)
+    return
+#IfWinActive
+
+#IfWinActive Realm
+    ^BackSpace::
+        Send ^+{Left}{Del}
+    return
+#If
+
+#IfWinActive Realm
+    ^z::
+        Gosub, PreviousValue
+    return
+#If
+
+#IfWinActive Realm
+    ^y::
+    ^+z::
+        Gosub, NextValue
+    return
+#If
+
+#If MouseIsOver("Edit1") && WinActive("Realm") && (A_OSVersion ~= "WIN_(7|8|8\.1|VISTA|2003|XP|2000)")
+    ^WheelUp::
+        ZoomFont("Edit1", 1)
+    return
+
+    ^WheelDown::
+        ZoomFont("Edit1", -1)
+    return
+#If
+
+#If MouseIsOver("Edit2") && WinActive("Realm") && (A_OSVersion ~= "WIN_(7|8|8\.1|VISTA|2003|XP|2000)")
+    ^WheelUp::
+        ZoomFont("Edit2", 1)
+    return
+
+    ^WheelDown::
+        ZoomFont("Edit2", -1)
+    return
+#If
+
+#If MouseIsOver("Edit26") && WinActive("Realm") && (A_OSVersion ~= "WIN_(7|8|8\.1|VISTA|2003|XP|2000)")
+    +WheelUp::
+        ZoomFont("Edit26", 1)
+    return
+
+    +WheelDown::
+        ZoomFont("Edit26", -1)
+    return
+#If
+
+#If MouseIsOver("Edit1") || MouseIsOver("Edit2") || MouseIsOver("Edit26")
+    ~LButton::
+        while GetKeyState("LButton", "P")
+        {
+            UpdateStatusBar(control)
+            Sleep 50
+        }
+    return
+#If
+
+; -------------------------------------------------------------------------------
+; ---------------------------------- DIALOGS ------------------------------------
+; -------------------------------------------------------------------------------
+
+; -------------------------------------------------------------------------------
+; ABOUT
+; -------------------------------------------------------------------------------
+
+ShowAboutDialog() {
+    global version
+    AboutDescription := "Realm " . version "`n`nAdvanced Text Manipulating Tool`n`nCopyright (c) 2024-2026 finnjest"
+    OnMessage(0x6, "WM_ACTIVATE")
+    Gui, About:New, +AlwaysOnTop
+    Gui, About:-MinimizeBox
+    Gui, About:Font, s10, Segoe UI
+    Gui, Color, FFFFFF
+    ; Gui, About:Font, cGray
+    Gui, About:Add, Text, x10 y10 -E0x200  -VScroll , %AboutDescription%
+    Gui, Add, Link, x10 y110, <a href="https://github.com/finnjest/realm">https://github.com/finnjest/realm</a>
+    Gui, About:Show,, About
+}
+return
+
+TrayShow:
+    global g_ShowTrayIcon
+    if (!g_ShowTrayIcon)
+        Menu, Tray, NoIcon
+    Gui, Show
+    WinActivate, Pegasys Wizard
+return
+
+; -------------------------------------------------------------------------------
+; ---------------------------------- TOOLTIPS -----------------------------------
+; -------------------------------------------------------------------------------
+
+; -------------------------------------------------------------------------------
+; CREATING TOOLTIP CONTROL
+; -------------------------------------------------------------------------------
+
+InlineHelp:
+    Help := New GuiControlTips(HGUI)
+    Help.SetDelayTimes(1000, 30000, -1)
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    Help.Attach(SBOption, "Stats are shown as: Input Text | Ouput Text or Column 1 | Column 2 | Output Text`nwith Column Mode enabled. Selected text stats are: Chars | Lines | Words")
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    Help.Attach(OutputToInputOption, "This will copy text from Output to Input.`nOutput field will be cleared.")
+    Help.Attach(ClearOption, "Pressing this button will result in clearing all exisiting edit fields.")
+    Help.Attach(UndoButton, "Undo")
+    Help.Attach(RedoButton, "Redo")
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    Help.Attach(SROption1, "The whitespace area above the first non-empty line`nwill be trimmed. Including the first leading space.")
+    Help.Attach(SROption2, "The whitespace area after the last non-empty line`nwill be trimmed. Including the last trailing space.")
+    Help.Attach(SROption3, "All whitespaces at the end of each line will be`ntrimmed. Empty lines wont be affected.")
+    Help.Attach(SROption4, "All whitespaces at the beginning of each line `nwill be trimmed. Empty lines wont be affected.")
+    Help.Attach(SROption5, "All non single whitespaces between words`nor characters will be removed.")
+    Help.Attach(SROption6, "All whitespace occurences will be replaced`nwith a single space.")
+    Help.Attach(SROption7, "All whitespace occurences will be removed.")
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    Help.Attach(LBBOption1, "For each line break group, only the specified amount`nwill be kept.")
+    Help.Attach(LBBOption2, "To each line break group only the specified amount`nwill be added.")
+    Help.Attach(LBBOption3, "From each line break group the specified amount of line`nbreaks will be removed.")
+    Help.Attach(LBBOption4, "All line breaks will be removed from the Input Text.")
+    Help.Attach(LBBOption5, "All line break groups will be replaced with spaces.`nThis action is known as 'Joining'.")
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    Help.Attach(LBEOption1, "Line break will be added before the specified character.")
+    Help.Attach(LBEOption2, "Line break will be added instead of the specified character.")
+    Help.Attach(LBEOption3, "Line break will be added after the specified character.")
+    Help.Attach(LBEOption4, "Line break will be replaced with the specified character.")
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    DDLDescription =
+    (
+1. Delete Lines Containing will remove all lines which contain the specified character.
+2. Delete NOT Lines Containing will delete all lines except those that contain the specified character.
+3. Delete Before or After will remove everything before or after the specified character.
+4. Delete Block will cut out a block of text which borders are the specified characters.
+    )
+    Help.Attach(DOption1, DDLDescription)
+    Help.Attach(DOption2, "The removing will be applied to each line individually, if chosen.`nOtherwise the action is applied to the whole text.")
+    Help.Attach(DOption3, "The removing will include the specified character(s).")
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    Help.Attach(DLOption1, "By default, two lines are considered duplicates, only if they`nare exactly the same, even when it comes to leading `nand trailing whitespaces. This option ignores them.")
+    Help.Attach(DLOption2, "By default, all duplicate lines, apart from the very first occurence, are removed.`nThis option replaces duplicates with emply lines.")
+    Help.Attach(DLOption3, "By default, the first unique word is kept, only its duplicates are deleted.`nThis option treats first unique occurence as its duplicates.")
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    Help.Attach(ELOption1, "Deletes only empty lines. Those that basically`nconsist of a line break.")
+    Help.Attach(ELOption2, "Deletes both empty and blank lines.")
+    Help.Attach(ELOption3, "Deletes only blank lines. Those that are`nnon-empty and consist of whitespace(s).")
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    Help.Attach(SCREdit, "This will simply delete all occurences of the specified`ncharacter. It only deletes characters, not words.")
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    Help.Attach(NExcludeEmpty, "Empty lines (those that consist of a line break)`nwill be kept, but excluded from numbering.")
+    Help.Attach(NExcludeBlank, "Blank lines (non-empty lines that consist only of whitespaces)`nwill be kept, but excluded from numbering.")
+    Help.Attach(NDeleteEmpty, "Empty lines will be excluded from numbering and deleted.")
+    Help.Attach(NDeleteBlank, "Blank lines will be excluded from numbering and deleted.")
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    Help.Attach(SORTOption1, "Reverses the sort order while preserving the selected`nsorting rules (alphabetical, line length or natural).")
+    Help.Attach(SORTOption2, "When enabled, sorts text in a case-sensitive way, prioritizing uppercase letters (A-Z)`nbefore lowercase (a-z). Works for alphabetical sorting only.")
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    Help.Attach(LROption1, "Define how many times the specified line(s) will be repeated.")
+    Help.Attach(LROption2, "All lines of Input Text will be repeated.")
+    Help.Attach(LROption3, "Only specified lines of Input Text will be repeated.")
+    Help.Attach(LROption4, "The character(s) that will separate repeated lines from each other.")
+    Help.Attach(LROption5, "All lines of Input Text will become a single string with all line breaks removed.`nThe specified number of repeated lines will be added to them.")
+    Help.Attach(LROption6, "The Input Text won't change. The specified number of repeated`nlines will be added after the very last line of Input Text.")
+    ; ---------------------------------------------------------------------------------------------------------------------------------------------
+    Help.Suspend(True)
+return
+
+RemoveToolTipRealm:
+    ToolTip
+Return
+
+; -------------------------------------------------------------------------------
+; EXIT
+; -------------------------------------------------------------------------------
+
+GuiClose:
+    global g_OnCloseAction
+    if (g_OnCloseAction = "Minimize To Tray") {
+        Gui, Hide
+        Menu, Tray, Icon
+    } else {
+        ExitApp
+    }
+return
+
+TrayExit:
+ExitApp
+return
+
+; -------------------------------------------------------------------------------
+; ------------------------------ FORMAT FUNCTIONS -------------------------------
+; -------------------------------------------------------------------------------
+
+; -------------------------------------------------------------------------------
+; FIND
+; -------------------------------------------------------------------------------
+
+Set_FindText(TextToSearch, SearchTerm, IgnoreCase := false, WholeWord := false, UseRegex := false, ByRef LastPosition := 0)
+{
+    if (StrLen(SearchTerm) = 0)
+        return 0
+
+    StartPos := (LastPosition = 0) ? 1 : LastPosition + StrLen(SearchTerm)
+
+    if (UseRegex) {
+        try {
+            if (WholeWord)
+                SearchTerm := "\b" . SearchTerm . "\b"
+
+            Options := ""
+            if (IgnoreCase)
+                Options .= "i"
+
+            FoundPos := RegExMatch(TextToSearch, Options . ")" . SearchTerm, Match, StartPos)
+            if (FoundPos > 0) {
+                LastPosition := FoundPos
+                return FoundPos
+            } else {
+                FoundPos := RegExMatch(TextToSearch, Options . ")" . SearchTerm, Match)
+                if (FoundPos > 0) {
+                    LastPosition := 0
+                    return FoundPos
+                }
+            }
+        } catch e {
+            throw Exception("Invalid Regex Pattern: " e.message)
+        }
+    } else {
+        if (WholeWord) {
+            SearchPattern := "\b" . RegExEscape(SearchTerm) . "\b"
+            FoundPos := RegExMatch(TextToSearch, (IgnoreCase ? "i)" : "") . SearchPattern, Match, StartPos)
+        } else {
+            FoundPos := IgnoreCase ? InStr(TextToSearch, SearchTerm, false, StartPos) : InStr(TextToSearch, SearchTerm, true, StartPos)
+        }
+
+        if (FoundPos = 0 && LastPosition != 0) {
+            if (WholeWord) {
+                FoundPos := RegExMatch(TextToSearch, (IgnoreCase ? "i)" : "") . SearchPattern, Match)
+            } else {
+                FoundPos := IgnoreCase ? InStr(TextToSearch, SearchTerm, false) : InStr(TextToSearch, SearchTerm, true)
+            }
+            LastPosition := 0
+        }
+
+        if (FoundPos > 0) {
+            LastPosition := FoundPos
+            return FoundPos
+        }
+    }
+    LastPosition := 0
+    return 0
+}
+
+; -------------------------------------------------------------------------------
+; SEARCH AND REPLACE
+; -------------------------------------------------------------------------------
+
+Set_TextReplace(TextToProcess, SearchText, ReplaceText, IgnoreCase := true, WholeWord := false, UseRegex := false)
+{
+    if (!UseRegex) {
+        escapedSearch := ""
+        Loop, Parse, SearchText
+        {
+            if A_LoopField ~= "[\.\*\+\?\^\$\{\}\(\)\|\[\]\\]"
+                escapedSearch .= "\" . A_LoopField
+            else
+                escapedSearch .= A_LoopField
+        }
+        SearchText := escapedSearch
+    }
+
+    regex := SearchText
+    if (WholeWord) {
+        regex := "\b" . SearchText . "\b"
+    }
+
+    if (IgnoreCase) {
+        return RegExReplace(TextToProcess, "(?i)" . regex, ReplaceText)
+    } else {
+        return RegExReplace(TextToProcess, regex, ReplaceText)
+    }
+}
+
+; -------------------------------------------------------------------------------
+; SUFFIX AND PREFIX
+; -------------------------------------------------------------------------------
+
+Set_TextAffix(TextToProcess, Prefix := "", Suffix := "", ExcludeEmpty := false, ExcludeBlank := false, DeleteEmpty := false, DeleteBlank := false)
+{
+    result := ""
+    Prefix := StrReplace(Prefix, " ", Chr(160))
+    Suffix := StrReplace(Suffix, " ", Chr(160))
+
+    Loop, Parse, TextToProcess, `n, `r
+    {
+        line := A_LoopField
+        trimmedLine := Trim(line)
+
+        if (DeleteEmpty && line = "")
+            continue
+
+        if (DeleteBlank && RegExMatch(line, "^\s+$"))
+            continue
+
+        if (ExcludeBlank && RegExMatch(line, "^\s+$"))
+        {
+            result .= line . "`n"
+            continue
+        }
+
+        if (!ExcludeEmpty || line != "")
+            line := Prefix . line . Suffix
+
+        result .= line . "`n"
+    }
+
+    return RTrim(result, "`n`r")
+}
+
+; -------------------------------------------------------------------------------
+; ENCLOSE
+; -------------------------------------------------------------------------------
+
+Set_TextEnclose(text, type, encLeft := "", encRight := "") {
+    static Enclosures := {"Guillemets":    [Chr(0x00AB), Chr(0x00BB)]
+        , "Double":        [Chr(0x0022), Chr(0x0022)]
+        , "Single":        [Chr(0x0027), Chr(0x0027)]
+        , "DoubleSmart":   [Chr(0x201C), Chr(0x201D)]
+        , "SingleSmart":   [Chr(0x2018), Chr(0x2019)]}
+
+    if (type = "Custom") {
+        leftChar := encLeft
+        rightChar := encRight
+    } else {
+        leftChar := Enclosures[type][1]
+        rightChar := Enclosures[type][2]
+    }
+
+    result := ""
+    Loop, Parse, text, `n, `r
+    {
+        result .= leftChar . A_LoopField . rightChar . "`n"
+    }
+    return RTrim(result, "`n`r")
+}
+
+; -------------------------------------------------------------------------------
+; SPACES
+; -------------------------------------------------------------------------------
+
+Set_TextSpaces(TextToProcess, TrimStart := false, TrimEnd := false, RemoveExtra := false, TrimAbove := false, TrimBelow := false, ReduceToSingle := false, RemoveAll := false)
+{
+    text := TextToProcess
+    result := ""
+
+    if (TrimStart) {
+        Loop, Parse, text, `n
+        {
+            Line := A_LoopField
+            Line := LTrim(Line)
+            Result .= Line . "`n"
+        }
+        text := Result
+        Result := ""
+    }
+
+    if (TrimEnd) {
+        Loop, Parse, text, `n
+        {
+            Line := A_LoopField
+            Line := RTrim(Line)
+            Result .= Line . "`n"
+        }
+        text := Result
+        Result := ""
+    }
+
+    if (RemoveExtra) {
+        Loop, Parse, text, `n
+        {
+            Line := A_LoopField
+            Line := RegExReplace(Line, "(\S)\s+(\S)", "$1 $2")
+            Result .= Line . "`n"
+        }
+        text := Result
+        Result := ""
+    }
+
+    if (TrimAbove)
+        text := RegExReplace(text, "^\s+", "")
+    if (TrimBelow)
+        text := RegExReplace(text, "\s+$", "")
+    if (ReduceToSingle)
+        text := RegExReplace(text, "[ \t]+", " ")
+
+    if (RemoveAll) {
+        text := RegExReplace(text, "[ \t]+", "")
+    }
+
+    return text
+}
+
+; -------------------------------------------------------------------------------
+; LINE BREAKS BASIC
+; -------------------------------------------------------------------------------
+
+Set_LineBreaksBasic(TextToProcess, Option := "RemoveAll", CustomBreaks := 1, LineBreakCount := 1, AutoProcessCount := 1)
+{
+    text := RegExReplace(TextToProcess, "\r\n|\r|\n", "`n")
+
+    if (Option = "RemoveAll")
+    {
+        text := RegExReplace(text, "\s*\n\s*", "")
+    }
+    else if (Option = "JoinAll")
+    {
+        text := RegExReplace(text, "\s*\n\s*", " ")
+    }
+    else if (Option = "Keep")
+    {
+        numBreaks := CustomBreaks
+        text := RegExReplace(text, "\s*\n\s*", "`n")
+        text := RegExReplace(text, "\n+", "`n")
+        breaks := RepeatStr("`n", numBreaks)
+        text := RegExReplace(text, "\n", breaks)
+    }
+    else if (Option = "Add")
+    {
+        if (LineBreakCount = "" || LineBreakCount < 0)
+            LineBreakCount := 1
+
+        lines := StrSplit(text, "`n")
+        result := ""
+
+        for index, line in lines {
+            if (Trim(line) != "" && Trim(line) != "/n") {
+                Loop, %LineBreakCount%
+                {
+                    result .= "`n"
+                }
+                result .= line
+            } else {
+                result .= line
+            }
+
+            if (index < lines.Length())
+                result .= "`n"
+        }
+
+        result := result, "`n"
+        text := result
+    }
+    else if (Option = "Remove")
+    {
+        if (AutoProcessCount < 1)
+            AutoProcessCount := 1
+
+        originalText := text
+
+        Loop, %AutoProcessCount%
+        {
+            lines := StrSplit(text, "`n", "`r")
+
+            combinedLines := []
+            currentLine := ""
+
+            for index, line in lines {
+                trimmedLine := Trim(line)
+
+                if (trimmedLine != "") {
+                    if (currentLine == "") {
+                        currentLine := trimmedLine
+                    } else {
+                        currentLine .= "" . trimmedLine
+                    }
+                } else {
+                    if (currentLine != "") {
+                        combinedLines.Push(currentLine)
+                        currentLine := ""
+                    }
+                    combinedLines.Push("")
+                }
+            }
+
+            if (currentLine != "") {
+                combinedLines.Push(currentLine)
+            }
+
+            processedLines := []
+            i := 1
+            while (i <= combinedLines.Length()) {
+                if (Trim(combinedLines[i]) != "") {
+                    processedLines.Push(combinedLines[i])
+
+                    if (i + 1 <= combinedLines.Length() && Trim(combinedLines[i+1]) == "") {
+                        i++
+                    }
+                } else {
+                    processedLines.Push(combinedLines[i])
+                }
+
+                i++
+            }
+
+            text := ""
+            for index, line in processedLines {
+                text .= line . "`n"
+            }
+
+            text := RegExReplace(text, "^(\n){" . AutoProcessCount . "}", "")
+        }
+    }
+
+    return text
+}
+
+; -------------------------------------------------------------------------------
+; LINE BREAKS EXTENDED
+; -------------------------------------------------------------------------------
+
+Set_LineBreaksExtended(TextToProcess, Option := "Before", Symbol := "", NumCharacters := 1, CaseInsensitive := false, WholeWord := false)
+{
+    text := TextToProcess
+    regexSymbol := Symbol
+
+    if (CaseInsensitive) {
+        regexSymbol := "(?i)" . Symbol
+    }
+
+    if (WholeWord) {
+        regexSymbol := "\b" . regexSymbol . "\b"
+    }
+
+    if (Option = "Replace") {
+        return RegExReplace(text, "`n", Symbol)
+    } else if (Option = "Before") {
+        return RegExReplace(text, "(" . regexSymbol . ")", "`n$1")
+    } else if (Option = "Instead") {
+        return RegExReplace(text, "(" . regexSymbol . ")", "`n")
+    } else if (Option = "After") {
+        return RegExReplace(text, "(" . regexSymbol . ")", "$1`n")
+    } else if (Option = "Every") {
+        if (NumCharacters > 0) {
+            result := ""
+            charCount := 0
+            Loop, Parse, text
+            {
+                charCount++
+                result .= A_LoopField
+                if (charCount >= NumCharacters) {
+                    result .= "`n"
+                    charCount := 0
+                }
+            }
+            return result
+        } else {
+            throw Exception("Please enter a valid number of characters.")
+        }
+    }
+    return text
+}
+
+; -------------------------------------------------------------------------------
+; DELETION
+; -------------------------------------------------------------------------------
+
+Set_TextDelete(TextToProcess, ActionType := "Delete Containing", Field1 := "", Field2 := "", IsLineContext := false, RemoveSymbol := false, CaseInsensitive := false, WholeWordsOnly := false)
+{
+    Switch ActionType
+    {
+    Case "Delete Containing":
+        return RemoveLines(TextToProcess, Field1, CaseInsensitive, WholeWordsOnly)
+
+    Case "Delete NOT Containing":
+        return RemoveNotLines(TextToProcess, Field2, CaseInsensitive, WholeWordsOnly)
+
+    Case "Delete Before and After":
+        return DeleteBeforeAfter(TextToProcess, Field1, Field2, IsLineContext, RemoveSymbol, CaseInsensitive, WholeWordsOnly)
+
+    Case "Delete Block":
+        return DeleteBlock(TextToProcess, Field1, Field2, IsLineContext, RemoveSymbol, CaseInsensitive, WholeWordsOnly)
+    }
+    return TextToProcess
+}
 
 RemoveLines(inputText, DeletionEditField1, CaseInsensitiveDel, WholeWordsOnlyDel) {
     StringSplit, Lines, InputText, `n
@@ -2062,7 +2681,7 @@ DeleteBeforeAfter(mainText, DeletionEditField1, DeletionEditField2, isLineContex
 
             processedText .= line . "`n"
         }
-        mainText := RTrim(processedText, "`n")
+        return RTrim(processedText, "`n")
     }
     else {
         if (WholeWordsOnlyDel) {
@@ -2111,12 +2730,9 @@ DeleteBeforeAfter(mainText, DeletionEditField1, DeletionEditField2, isLineContex
 }
 
 DeleteBlock(inputText, DeletionEditField1, DeletionEditField2, isLineContext, removeSymbol, CaseInsensitiveDel, WholeWordsOnlyDel) {
-    ; Set regex options based on case sensitivity
     regexOptions := CaseInsensitiveDel ? "i)" : ""
 
-    ; Determine regex pattern based on checkboxes and context
     if (isLineContext) {
-        ; Line-context mode: only match within a single line
         if (WholeWordsOnlyDel) {
             if (removeSymbol) {
                 pattern := "\b" . EscapeRegExChars(DeletionEditField1) . ".*?" . EscapeRegExChars(DeletionEditField2) . "\b"
@@ -2131,25 +2747,20 @@ DeleteBlock(inputText, DeletionEditField1, DeletionEditField2, isLineContext, re
             }
         }
 
-        ; Split input into lines and process each line separately
         StringSplit, Lines, InputText, `n
         Result := ""
 
         Loop, %Lines0%
         {
-            ; Remove the matched text
             processedLine := RegExReplace(Lines%A_Index%, regexOptions . pattern, "")
 
-            ; Add the processed line to output if it's not empty
             if (processedLine != "") {
                 Result .= processedLine . "`n"
             }
         }
 
-        ; Remove trailing newline
         return RTrim(Result, "`n")
     } else {
-        ; Multiline mode: match across multiple lines
         if (WholeWordsOnlyDel) {
             if (removeSymbol) {
                 pattern := "\b" . EscapeRegExChars(DeletionEditField1) . ".*?" . EscapeRegExChars(DeletionEditField2) . "\b"
@@ -2164,7 +2775,6 @@ DeleteBlock(inputText, DeletionEditField1, DeletionEditField2, isLineContext, re
             }
         }
 
-        ; Remove the matched text across multiple lines
         Result := RegExReplace(inputText, regexOptions . pattern, "")
 
         return Result
@@ -2184,60 +2794,83 @@ EscapeRegExChars(str) {
 ; DUPLICATE LINES
 ; -------------------------------------------------------------------------------
 
-RemoveDuplicates:
-    Gui, Submit, NoHide
-    StringSplit, Lines, InputText, `n
-    UniqueLines := {}
+Set_RemoveDuplicates(TextToProcess, IgnoreCase := false, TrimSpaces := false, KeepDuplicates := false, DeleteFirstDuplicate := false)
+{
+    StringSplit, Lines, TextToProcess, `n
     ResultText := ""
-    FirstOccurrences := {}
+    UniqueLines := []
 
     Loop, % Lines0
     {
-        Line := Lines%A_Index%
+        currentLine := Lines%A_Index%
+        processedCurrentLine := TrimSpaces ? Trim(currentLine) : currentLine
 
-        checkLine := TrimSpaces ? Trim(Line) : Line
-
-        if (checkLine = "")
-        {
-            ResultText .= "`n"
+        if (processedCurrentLine = "") {
+            ResultText .= currentLine "`n"
             continue
         }
 
-        regexLine := IgnoreCase ? "(?i)" . checkLine : checkLine
-
         isDuplicate := false
-        for key, value in UniqueLines
+        duplicateIndex := 0
+
+        Loop, % A_Index - 1
         {
-            if (RegExMatch(key, "^" . regexLine . "$"))
+            previousLine := Lines%A_Index%
+            processedPreviousLine := TrimSpaces ? Trim(previousLine) : previousLine
+
+            if (IgnoreCase) {
+                if (processedPreviousLine = processedCurrentLine) {
+                    isDuplicate := true
+                    duplicateIndex := A_Index
+                    break
+                }
+            }
+            else
             {
-                isDuplicate := true
-                break
+                if (processedPreviousLine == processedCurrentLine) {
+                    isDuplicate := true
+                    duplicateIndex := A_Index
+                    break
+                }
             }
         }
 
-        if (!isDuplicate)
-        {
-            UniqueLines[checkLine] := true
-            FirstOccurrences[checkLine] := Line
-            ResultText .= Line "`n"
+        if (!isDuplicate) {
+            if (DeleteFirstDuplicate) {
+                UniqueLines[processedCurrentLine] := StrLen(ResultText) + 1
+            }
+            ResultText .= currentLine "`n"
         }
         else
         {
-            if (DeleteFirstDuplicate)
-            {
-                ; Remove the first occurrence if this is a duplicate
-                if (FirstOccurrences.HasKey(checkLine))
-                {
-                    ; If KeepDuplicates is on, add a blank line instead of completely removing
-                    if (KeepDuplicates)
-                    {
-                        ResultText := StrReplace(ResultText, FirstOccurrences[checkLine] . "`n", "`n")
+            if (DeleteFirstDuplicate && duplicateIndex > 0) {
+                firstLineText := Lines%duplicateIndex%
+                processedFirstLine := TrimSpaces ? Trim(firstLineText) : firstLineText
+
+                if (UniqueLines.HasKey(processedFirstLine)) {
+                    pos := UniqueLines[processedFirstLine]
+
+                    StringMid, lineToFind, ResultText, pos
+                    lineEndPos := InStr(lineToFind, "`n")
+                    if (lineEndPos > 0) {
+                        lineEndPos += pos - 1
+                        lineLength := lineEndPos - pos + 1
+
+                        if (KeepDuplicates) {
+                            ResultText := SubStr(ResultText, 1, pos - 1) . "`n" . SubStr(ResultText, pos + lineLength)
+                        }
+                        else {
+                            ResultText := SubStr(ResultText, 1, pos - 1) . SubStr(ResultText, pos + lineLength)
+                        }
+
+                        UniqueLines.Delete(processedFirstLine)
+                        adjustment := KeepDuplicates ? 1 : lineLength
+                        for key, value in UniqueLines
+                        {
+                            if (value > pos)
+                                UniqueLines[key] := value - adjustment
+                        }
                     }
-                    else
-                    {
-                        ResultText := StrReplace(ResultText, FirstOccurrences[checkLine] . "`n", "")
-                    }
-                    FirstOccurrences.Delete(checkLine)
                 }
             }
 
@@ -2248,27 +2881,19 @@ RemoveDuplicates:
         }
     }
 
-    ResultText := RTrim(ResultText, "`n")
-    GuiControl,, OutputText, %ResultText%
-    if (AutoInput == 1) {
-        Gosub, CopyToInput
-    }
-    Gosub, UpdateStats
-return
+    return RTrim(ResultText, "`n")
+}
 
 ; -------------------------------------------------------------------------------
 ; EMPTY AND BLANK LINES REMOVAL
 ; -------------------------------------------------------------------------------
 
-DeleteEmptyBlankLines:
-    ; Get the input text from the input field
-    Gui, Submit, NoHide
-    text := InputText
+Set_RemoveEmptyLines(TextToProcess, Option := "Empty")
+{
+    text := TextToProcess
 
-    ; Determine which option is selected
-    if (DeleteOnlyEmptyLines) {
-        ; Delete all empty lines (no characters)
-        StringReplace, text, text, `r`n, `n, All ; Normalize line endings
+    if (Option = "Empty") {
+        StringReplace, text, text, `r`n, `n, All
         StringSplit, lines, text, `n
         result := ""
         Loop, %lines0% {
@@ -2276,9 +2901,8 @@ DeleteEmptyBlankLines:
                 result .= lines%A_Index% "`n"
             }
         }
-    } else if (DeleteBothEmptyBlankLines) {
-        ; Delete lines that are only whitespace
-        StringReplace, text, text, `r`n, `n, All ; Normalize line endings
+    } else if (Option = "Both") {
+        StringReplace, text, text, `r`n, `n, All
         StringSplit, lines, text, `n
         result := ""
         Loop, %lines0% {
@@ -2286,9 +2910,8 @@ DeleteEmptyBlankLines:
                 result .= lines%A_Index% "`n"
             }
         }
-    } else if (DeleteOnlyBlankLines) {
-        ; Delete lines that are completely blank (no characters or spaces)
-        StringReplace, text, text, `r`n, `n, All ; Normalize line endings
+    } else if (Option = "Blank") {
+        StringReplace, text, text, `r`n, `n, All
         StringSplit, lines, text, `n
         result := ""
         Loop, %lines0% {
@@ -2298,139 +2921,91 @@ DeleteEmptyBlankLines:
         }
     }
 
-    ; Display the result in the result field
-    GuiControl,, OutputText, %result%
-    if (AutoInput == 1) {
-        Gosub, CopyToInput
-    }
-    Gosub, UpdateStats
-return
+    return result
+}
 
 ; -------------------------------------------------------------------------------
 ; SPECIAL CHARACTER REMOVAL
 ; -------------------------------------------------------------------------------
 
-RemoveChars:
-    Gui, Submit, NoHide
-    Output := InputText
+Set_RemoveChars(TextToProcess, CharsToRemove)
+{
+    Output := TextToProcess
 
-    Loop, Parse, RemoveCharsField
+    Loop, Parse, CharsToRemove
     {
         StringReplace, Output, Output, %A_LoopField%, , All
     }
 
-    GuiControl,, OutputText, %Output%
-    if (AutoInput == 1) {
-        Gosub, CopyToInput
-    }
-    Gosub, UpdateStats
-return
+    return Output
+}
 
 ; -------------------------------------------------------------------------------
 ; NUMBERING
 ; -------------------------------------------------------------------------------
 
-NumberingMode1:
-    Gui, Submit, NoHide
-    GuiControl,, StartChar, 1
-return
-
-NumberingMode2:
-    Gui, Submit, NoHide
-    GuiControl,, StartChar, I
-return
-
-NumberingMode3:
-    Gui, Submit, NoHide
-    GuiControl,, StartChar, A
-return
-
-NumberText:
-    Gui, Submit, NoHide
+Set_TextNumbering(TextToProcess, NumberingMode := "Numbers", StartChar := 1, Prefix := "", Suffix := " ", ExcludeBlankLines := false, ExcludeEmptyLines := false, DeleteEmptyLines := false, DeleteBlankLines := false, StripLeadingNumbers := false, LowerCase := false, AddDot := true, LeadingZeros := false)
+{
     Output := ""
-    Prefix := (Prefix != "") ? Prefix : "" ; Префикс по умолчанию пустой
-    Suffix := (Suffix != "") ? Suffix : "" ; Суффикс по умолчанию пустой
+    Prefix := (Prefix != "") ? Prefix : ""
+    Suffix := (Suffix != "") ? Suffix : ""
     Prefix := StrReplace(Prefix, " ", Chr(160))
     Suffix := StrReplace(Suffix, " ", Chr(160))
-    dot := (AddDot = "1") ? "." : "" ; Точка добавляется, если чекбокс активен
-    lowercase := (Uppercase = "1") ? true : false ; Нумерация в нижнем регистре
+    dot := (AddDot = "1") ? "." : ""
+    lowercase := (LowerCase = "1") ? true : false
 
-    ; Устанавливаем значение по умолчанию для начального символа
-    if (NumberingMode3 = "1") ; Буквы (A)
+    if (NumberingMode = "Letters")
     {
-        StartChar := StartChar ? StartChar : "A" ; Используем 'A', если не заполнено
+        StartChar := StartChar ? StartChar : "A"
     }
-    else if (NumberingMode2 = "1") ; Римские цифры
+    else if (NumberingMode = "Roman Numerals")
     {
-        StartChar := StartChar ? StartChar : 1 ; Устанавливаем начальный символ в 1, если пусто
+        StartChar := StartChar ? StartChar : 1
         StartChar := IsNumber(StartChar) ? StartChar : RomanToDecimal(StartChar)
     }
     else
     {
-        StartChar := StartChar ? StartChar : 1 ; Для цифр используем число 1
+        StartChar := StartChar ? StartChar : 1
     }
 
-    ; if (DeleteStartNumbers = "1") {
-    ;     ; Regex to remove leading digits and special characters from the start of each line
-    ;     tempInputText := ""
-    ;     Loop, Parse, InputText, `n
-    ;     {
-    ;         ; Remove leading digits, special characters, and whitespace from the start of the line
-    ;         cleanedLine := RegExReplace(A_LoopField, "^[\s\d]+", "") ; I had /W here to remove non-word chars but it removes unicode stuff too
-    ;         tempInputText .= cleanedLine . "`n"
-    ;     }
-    ;     InputText := Trim(tempInputText, "`n")
-    ; }
-
-    if (DeleteStartNumbers = "1") {
-        ; Regex to remove leading digits and any following special characters/whitespace
+    if (StripLeadingNumbers = "1") {
         tempInputText := ""
-        Loop, Parse, InputText, `n
+        Loop, Parse, TextToProcess, `n
         {
-            ; Remove leading digits followed by any special chars (.,), etc.) and whitespace
             cleanedLine := RegExReplace(A_LoopField, "^[\s\d]+[\.\,\)\]\}\s]*", "")
             tempInputText .= cleanedLine . "`n"
         }
-        InputText := Trim(tempInputText, "`n")
+        TextToProcess := Trim(tempInputText, "`n")
 
-        if (NumberingMode1 != "1" && NumberingMode2 != "1" && NumberingMode3 != "1") {
-            Output := Trim(tempInputText, "`n")
+        if (NumberingMode != "Numbers" && NumberingMode != "Roman Numerals" && NumberingMode != "Letters") {
+            return Trim(tempInputText, "`n")
         }
-
     }
 
-    ; Определяем режим нумерации
-    if (NumberingMode1 = "1") ; Digits
+    if (NumberingMode = "Numbers")
     {
-        ; Calculate max width for leading zeros
-        maxWidth := (LeadingZeros = "1") ? GetMaxNumberWidth(StartChar, totalLines, numberingMode) : 0
+        maxWidth := (LeadingZeros = "1") ? GetMaxNumberWidth(StartChar, TextToProcess, NumberingMode) : 0
 
-        Loop, Parse, InputText, `n
+        Loop, Parse, TextToProcess, `n
         {
-
             if (DeleteEmptyLines && A_LoopField = "")
             {
                 continue
             }
-            ; Handle DeleteBlankLines
             else if (DeleteBlankLines && RegExMatch(A_LoopField, "^\s+$"))
             {
                 continue
             }
-            ; Handle ExcludeBlankLines
             else if (ExcludeBlankLines && RegExMatch(A_LoopField, "^\s+$"))
             {
-                ; Add the blank line without numbering
                 Output .= A_LoopField . "`n"
             }
-            ; Original empty line handling
             else if (ExcludeEmptyLines && A_LoopField = "")
             {
                 Output .= A_LoopField . "`n"
             }
             else if (!DeleteEmptyLines || (DeleteEmptyLines && A_LoopField != ""))
             {
-                ; Format number with leading zeros if enabled
                 num := (LeadingZeros = "1")
                     ? Prefix . Format("{:0" . maxWidth . "}", StartChar)
                     : Prefix . Format("{:U}", StartChar)
@@ -2441,88 +3016,74 @@ NumberText:
             }
         }
     }
-
-    else if (NumberingMode2 = "1") ; Римские цифры
+    else if (NumberingMode = "Roman Numerals")
     {
-        Loop, Parse, InputText, `n
+        Loop, Parse, TextToProcess, `n
         {
             if (DeleteEmptyLines && A_LoopField = "")
             {
                 continue
             }
-            ; Handle DeleteBlankLines
             else if (DeleteBlankLines && RegExMatch(A_LoopField, "^\s+$"))
             {
                 continue
             }
-            ; Handle ExcludeBlankLines
             else if (ExcludeBlankLines && RegExMatch(A_LoopField, "^\s+$"))
             {
-                ; Add the blank line without numbering
                 Output .= A_LoopField . "`n"
             }
-            ; Original empty line handling
             else if (ExcludeEmptyLines && A_LoopField = "")
             {
                 Output .= A_LoopField . "`n"
             }
-            else if (!DeleteEmptyLines || (DeleteEmptyLines && A_LoopField != "")) ; Пропускаем пустые строки, если чекбокс активен и строка пуста
+            else if (!DeleteEmptyLines || (DeleteEmptyLines && A_LoopField != ""))
             {
                 romanNum := ToRoman(StartChar)
                 if (lowercase)
-                    romanNum := Format("{:L}", romanNum) ; Преобразуем в нижний регистр
-                num := Prefix . romanNum ; Используем римские цифры
-                separator := (Suffix != "") ? "" : dot ; Точка ставится только если суффикса нет и чекбокс активен
+                    romanNum := Format("{:L}", romanNum)
+                num := Prefix . romanNum
+                separator := (Suffix != "") ? "" : dot
                 Output .= num . dot . Suffix . A_LoopField . "`n"
                 StartChar++
             }
         }
     }
-    else if (NumberingMode3 = "1") ; Буквы (A)
+    else if (NumberingMode = "Letters")
     {
-        startIndex := (StartChar = "") ? 1 : Asc(StartChar) - 64 ; 'A' = 65 в ASCII
-        Loop, Parse, InputText, `n
+        startIndex := (StartChar = "") ? 1 : Asc(StartChar) - 64
+        Loop, Parse, TextToProcess, `n
         {
             if (DeleteEmptyLines && A_LoopField = "")
             {
                 continue
             }
-            ; Handle DeleteBlankLines
             else if (DeleteBlankLines && RegExMatch(A_LoopField, "^\s+$"))
             {
                 continue
             }
-            ; Handle ExcludeBlankLines
             else if (ExcludeBlankLines && RegExMatch(A_LoopField, "^\s+$"))
             {
-                ; Add the blank line without numbering
                 Output .= A_LoopField . "`n"
             }
-            ; Original empty line handling
             else if (ExcludeEmptyLines && A_LoopField = "")
             {
                 Output .= A_LoopField . "`n"
             }
-            else if (!DeleteEmptyLines || (DeleteEmptyLines && A_LoopField != "")) ; Пропускаем пустые строки, если чекбокс активен и строка пуста
+            else if (!DeleteEmptyLines || (DeleteEmptyLines && A_LoopField != ""))
             {
-                letter := Chr(64 + startIndex) ; 'A' = 65 в ASCII
+                letter := Chr(64 + startIndex)
                 if (lowercase)
-                    letter := Format("{:L}", letter) ; Преобразуем в нижний регистр
+                    letter := Format("{:L}", letter)
                 num := Prefix . letter
-                separator := (Suffix != "") ? "" : dot ; Точка ставится только если суффикса нет и чекбокс активен
+                separator := (Suffix != "") ? "" : dot
                 Output .= num . dot . Suffix . A_LoopField . "`n"
                 startIndex++
             }
         }
     }
 
-    ; Выводим результат
-    GuiControl,, OutputText, %Output%
-    if (AutoInput == 1) {
-        Gosub, CopyToInput
-    }
-    Gosub, UpdateStats
-return
+    return Output
+}
 
 ToRoman(num) {
     local romanNumerals := [["M", 1000], ["CM", 900], ["D", 500], ["CD", 400], ["C", 100], ["XC", 90], ["L", 50], ["XL", 40], ["X", 10], ["IX", 9], ["V", 5], ["IV", 4], ["I", 1]]
@@ -2559,12 +3120,11 @@ IsNumber(value) {
     return (value+0) = value
 }
 
-GetMaxNumberWidth(startChar, totalLines, numberingMode) {
+GetMaxNumberWidth(startChar, InputText, numberingMode) {
     local maxWidth := 0
     local currentNum := startChar
     local linesCount := 0
 
-    ; Count actual numbered lines
     Loop, Parse, InputText, `n
     {
         if (!SkipEmptyLines || (SkipEmptyLines && Trim(A_LoopField) != ""))
@@ -2573,11 +3133,11 @@ GetMaxNumberWidth(startChar, totalLines, numberingMode) {
         }
     }
 
-    if (NumberingMode1 = "1") ; Digits
+    if (NumberingMode = "Numbers")
     {
         maxWidth := StrLen(currentNum + linesCount - 1)
     }
-    else if (NumberingMode2 = "1") ; Roman numerals
+    else if (NumberingMode = "Roman Numerals")
     {
         Loop, % linesCount
         {
@@ -2586,7 +3146,7 @@ GetMaxNumberWidth(startChar, totalLines, numberingMode) {
             currentNum++
         }
     }
-    else if (NumberingMode3 = "1") ; Letters
+    else if (NumberingMode = "Letters")
     {
         startIndex := (startChar = "") ? 1 : Asc(startChar) - 64
         maxWidth := StrLen(Chr(64 + startIndex + linesCount - 1))
@@ -2599,77 +3159,65 @@ GetMaxNumberWidth(startChar, totalLines, numberingMode) {
 ; SORTING
 ; -------------------------------------------------------------------------------
 
-UpdateSortOrder:
-    ; Обновляем сортировку при изменении радиокнопки
-    Gui, Submit, NoHide
-return
+Set_TextSort(TextToProcess, SortType := "Alphabetical", Reverse := false, CaseSensitive := false)
+{
+    text := TextToProcess
 
-SortStrings:
-    Gui, Submit, NoHide ; Получаем данные из GUI
-    if (Alph && !ReverseSorting && !ConsiderCaseSorting) ; По алфавиту
+    if (SortType = "Alphabetical" && !Reverse && !CaseSensitive)
     {
-        Sort, InputText,
+        Sort, text,
     }
-    else if (Alph && ReverseSorting && !ConsiderCaseSorting) ; Обратная сортировка по алфавиту
+    else if (SortType = "Alphabetical" && Reverse && !CaseSensitive)
     {
-        Sort, InputText, R
+        Sort, text, R
     }
-    else if (Alph && ConsiderCaseSorting && !ReverseSorting)
+    else if (SortType = "Alphabetical" && CaseSensitive && !Reverse)
     {
-        Sort, InputText, CL F ForceCaseOrder
+        Sort, text, CL F ForceCaseOrder
     }
-    else if (Alph && ConsiderCaseSorting && ReverseSorting)
+    else if (SortType = "Alphabetical" && CaseSensitive && Reverse)
     {
-        Sort, InputText, CL F ForceCaseOrder
-        Sort, InputText, F Rvrs
+        Sort, text, CL F ForceCaseOrder
+        Sort, text, F Rvrs
     }
-    else if (Flip) ; Обратная сортировка строк
+    else if (SortType = "Upside Down")
     {
-        Sort, InputText, F Rvrs
+        Sort, text, F Rvrs
     }
-    else if (LineLength && !ReverseSorting) ; По длине строки
+    else if (SortType = "Line Length" && !Reverse)
     {
-        Sort, InputText, F SortFunc
+        Sort, text, F SortFunc
     }
-    else if (LineLength && ReverseSorting) ; Обратная сортировка по длине строки
+    else if (SortType = "Line Length" && Reverse)
     {
-        Sort, InputText, F RevSortFunc
+        Sort, text, F RevSortFunc
     }
-    else if (Natural && !ReverseSorting) ; Естественная сортировка
+    else if (SortType = "Natural" && !Reverse)
     {
-        Sort, InputText, F NaturalSortFunc
+        Sort, text, F NaturalSortFunc
     }
-    else if (Natural && ReverseSorting) ; Естественная сортировка (обратная)
+    else if (SortType = "Natural" && Reverse)
     {
-        Sort, InputText, F NaturalSortFunc ; Сначала выполняем естественную сортировку
-        Sort, InputText, F Rvrs ; Затем переворачиваем результат
+        Sort, text, F NaturalSortFunc
+        Sort, text, F Rvrs
     }
 
-    OutputText := InputText ; Сохраняем отсортированный текст в переменную
-    GuiControl,, OutputText, %OutputText% ; Обновляем поле вывода
-    if (AutoInput == 1) {
-        Gosub, CopyToInput
-    }
-    Gosub, UpdateStats
-return
+    return text
+}
 
 ForceCaseOrder(a, b, offset) {
-    aFirstChar := Asc(SubStr(a, 1, 1))  ; ASCII value of first char
+    aFirstChar := Asc(SubStr(a, 1, 1))
     bFirstChar := Asc(SubStr(b, 1, 1))
 
-    ; Classify case (UPPER=1, LOWER=2)
     aCase := (aFirstChar >= 65 && aFirstChar <= 90) ? 1 : 2
     bCase := (bFirstChar >= 65 && bFirstChar <= 90) ? 1 : 2
 
-    ; If cases differ, uppercase comes first
     if (aCase != bCase)
         return aCase < bCase ? -1 : 1
-    ; If same case, sort alphabetically
     else
         return a < b ? -1 : a > b ? 1 : 0
 }
 
-; Функция для обратной сортировки строк
 Rvrs(a1, a2, b)
 {
     return b
@@ -2677,29 +3225,23 @@ Rvrs(a1, a2, b)
 
 SortFunc(lineA, lineB, offset)
 {
-    ; Return positive if lineA is longer than line B.
-    ; Return negative if lineA is shorter than line B.
     if StrLen(lineA) != StrLen(lineB)
         return StrLen(lineA)-StrLen(lineB)
-    ; Use offset to try to preserve the order in the file when two lines are of equal length.
     return -offset
 }
 
 RevSortFunc(lineA, lineB, offset)
 {
-    ; Обратная сортировка по длине строки
     if StrLen(lineA) != StrLen(lineB)
-        return StrLen(lineB) - StrLen(lineA) ; Здесь изменено на lineB
+        return StrLen(lineB) - StrLen(lineA)
     return -offset
 }
 
-; Функция для естественной сортировки
 NaturalSortFunc(a, b)
 {
     return NaturalCompare(a, b)
 }
 
-; Функция сравнения для естественной сортировки
 NaturalCompare(a, b)
 {
     aLen := StrLen(a), bLen := StrLen(b)
@@ -2707,20 +3249,18 @@ NaturalCompare(a, b)
 
     while (i <= aLen && j <= bLen)
     {
-        ; Извлекаем числовые и нечисловые части
         aNum := "", bNum := ""
         while (i <= aLen && IsDigit(SubStr(a, i, 1)))
             aNum .= SubStr(a, i++, 1)
         while (j <= bLen && IsDigit(SubStr(b, j, 1)))
             bNum .= SubStr(b, j++, 1)
 
-        ; Сравниваем числа, если они есть
         if (aNum != "" && bNum != "")
         {
             if (aNum != bNum)
                 return aNum - bNum
         }
-        else ; Сравниваем символы
+        else
         {
             aChar := SubStr(a, i++, 1)
             bChar := SubStr(b, j++, 1)
@@ -2729,11 +3269,9 @@ NaturalCompare(a, b)
         }
     }
 
-    ; Если одна строка закончилась, а другая нет
     return aLen - bLen
 }
 
-; Вспомогательная функция для проверки, является ли символ цифрой
 IsDigit(char)
 {
     return char >= "0" && char <= "9"
@@ -2743,119 +3281,107 @@ IsDigit(char)
 ; CASE CHANGING
 ; -------------------------------------------------------------------------------
 
-ConvertText:
-    Gui, Submit, NoHide
-    InputText := InputText
+Set_TextCase_DEP(TextToProcess, CaseType := "Upper")
+{
+    InputText := TextToProcess
     OutputText := ""
 
-    ; Проверка, какая радиокнопка выбрана
-    if (CaseUpper) {
+    if (CaseType = "Upper") {
         StringUpper, OutputText, InputText
-    } else if (CaseLower) {
+    } else if (CaseType = "Lower") {
         StringLower, OutputText, InputText
-    } else if (CaseTitled) {
+    } else if (CaseType = "Title") {
         StringUpper, OutputText, InputText, T
-    } else if (CaseSentence) {
+    } else if (CaseType = "Sentence") {
         StringLower, InputText, InputText
-        sentences := StrSplit(InputText, "`n") ; Разделяем текст на строки
+        sentences := StrSplit(InputText, "`n")
 
         for index, line in sentences {
-            if (line != "") { ; Проверяем, что строка не пустая
+            if (line != "") {
                 words := StrSplit(line, " ")
                 newLine := ""
 
                 for wordIndex, word in words {
-                    ; Проверяем, нужно ли преобразовать первое слово в заглавную букву
                     if (wordIndex = 1 || RegExMatch(newLine, "(\.|!|\?)\s*$")) {
-                        word := Format("{:U}", SubStr(word, 1, 1)) . SubStr(word, 2) ; Заглавная буква
+                        word := Format("{:U}", SubStr(word, 1, 1)) . SubStr(word, 2)
                     }
-                    newLine .= word ; Добавляем слово без пробела
+                    newLine .= word
 
-                    ; Добавляем пробел только если это не последнее слово
                     if (wordIndex < words.MaxIndex()) {
                         newLine .= " "
                     }
                 }
-                OutputText .= newLine ; Добавляем строку без лишнего пробела
+                OutputText .= newLine
             }
-            OutputText .= "`n" ; Добавляем перенос строки после каждой строки
+            OutputText .= "`n"
         }
 
-        ; Убираем последний перенос строки, если он есть
         StringTrimRight, OutputText, OutputText, 1
     }
 
-    ; Обновляем поле вывода
-    GuiControl,, OutputText, %OutputText%
-    if (AutoInput == 1) {
-        Gosub, CopyToInput
-    }
-    Gosub, UpdateStats
-return
+    return OutputText
+}
+
+; Source: https://github.com/Ixiko/AHK-libs-and-classes-collection/blob/master/libs/a-f/CaseChange.ahk
+
+Set_TextCase(text,type){
+    static X:= ["AHK","AutoHotkey"]
+    if (type="S") {
+        text := RegExReplace(RegExReplace(text, "(.*)", "$L{1}"), "(?<=[^a-zA-Z0-9_-]\s|\n).|^.", "$U{0}")
+    } else if (type="I")
+        text := RegExReplace(text, "(\p{Lu})|(\p{Ll})", "$L1$U2") ; Unicode
+    else text:=RegExReplace(text, "(.*)", "$" type "{1}")
+
+        if (type="S" OR type="T")
+            for _, word in X
+                text:= RegExReplace(text,"i)\b" word "\b", word)
+    return text
+}
 
 ; -------------------------------------------------------------------------------
 ; ALIGNING
 ; -------------------------------------------------------------------------------
 
-Allign:
-    Gui, Submit, NoHide
-    text := InputText
-    fillChar := FillChar
-    lineLength := LineLengthAlligning
+Set_TextAlign(TextToAlign, LineLength, AlignmentType, FillChar := " ")
+{
+    result := ""
+    FillChar := SubStr(FillChar, 1, 1)
 
-    if (Left = 1) {
-        ; Выравнивание влево
-        result := ""
-        lines := StrSplit(text, "`n")
-        for index, line in lines {
-            result.= line
-            while (StrLen(result) < lineLength) {
-                result.= fillChar
-            }
-            ; Добавляем перевод строки только если это не последняя строка
-            if (index < lines.MaxIndex()) {
-                result.= "`n"
-            }
+    lines := StrSplit(TextToAlign, "`n", "`r")
+
+    for index, line in lines
+    {
+        lineLength_current := StrLen(line)
+        paddingNeeded := LineLength - lineLength_current
+
+        if (paddingNeeded < 0) {
+            alignedLine := line
         }
-    } else if (Center = 1) {
-        ; Выравнивание по центру
-        result := ""
-        lines := StrSplit(text, "`n")
-        for index, line in lines {
-            spaces := lineLength - StrLen(line)
-            leftSpaces := spaces // 2
-            rightSpaces := spaces - leftSpaces
-            result.= Repeat(fillChar, leftSpaces)
-            result.= line
-            result.= Repeat(fillChar, rightSpaces)
-            ; Добавляем перевод строки только если это не последняя строка
-            if (index < lines.MaxIndex()) {
-                result.= "`n"
-            }
+        else if (InStr(AlignmentType, "Left"))
+        {
+            alignedLine := line . Repeat(FillChar, paddingNeeded)
         }
-    } else if (Right = 1) {
-        ; Выравнивание вправо
-        result := ""
-        lines := StrSplit(text, "`n")
-        for index, line in lines {
-            result.= Repeat(fillChar, lineLength - StrLen(line))
-            result.= line
-            ; Добавляем перевод строки только если это не последняя строка
-            if (index < lines.MaxIndex()) {
-                result.= "`n"
-            }
+        else if (InStr(AlignmentType, "Center"))
+        {
+            leftPad := paddingNeeded // 2
+            rightPad := paddingNeeded - leftPad
+            alignedLine := Repeat(FillChar, leftPad) . line . Repeat(FillChar, rightPad)
+        }
+        else if (InStr(AlignmentType, "Right"))
+        {
+            alignedLine := Repeat(FillChar, paddingNeeded) . line
+        }
+
+        result .= alignedLine
+
+        if (index < lines.MaxIndex())
+        {
+            result .= "`n"
         }
     }
+    return result
+}
 
-    ; Вывод результата
-    GuiControl,, OutputText, %result%
-    if (AutoInput == 1) {
-        Gosub, CopyToInput
-    }
-    Gosub, UpdateStats
-return
-
-; Функция для повторения символа
 Repeat(char, count) {
     result := ""
     Loop, %count%
@@ -2869,61 +3395,44 @@ Repeat(char, count) {
 ; PADDING
 ; -------------------------------------------------------------------------------
 
-AddPadding:
+Set_TextPadding(TextToProcess, PaddingSize, PaddingChar := " ", PaddingType := "Left")
+{
+    padding := ""
+    Loop, % PaddingSize
+        padding .= PaddingChar
+
+    ResultText := ""
+    Loop, Parse, TextToProcess, `n
     {
-        Gui, Submit, NoHide ; Считывание значений из полей GUI
-        padding := ""
-        Loop, % PaddingSize
-            padding .= PaddingChar ; Создание строки отступа
+        if (PaddingType = "Both")
+            ResultLine := padding . A_LoopField . padding
+        else if (PaddingType = "Left")
+            ResultLine := padding . A_LoopField
+        else if (PaddingType = "Right")
+            ResultLine := A_LoopField . padding
 
-        ; Разделение входного текста на строки
-        ResultText := ""
-        Loop, Parse, InputText, `n
-        {
-            ; Проверка выбранного направления и добавление отступов
-            if (PadBoth) ; В обе стороны
-                ResultLine := padding . A_LoopField . padding
-            else if (PadLeft) ; Только слева
-                ResultLine := padding . A_LoopField
-            else if (PadRight) ; Только справа
-                ResultLine := A_LoopField . padding
-
-            ; Добавление обработанной строки в результат
-            ResultText .= ResultLine . "`n"
-        }
-
-        GuiControl,, OutputText, %ResultText% ; Отображение результата
-        if (AutoInput == 1) {
-            Gosub, CopyToInput
-        }
-        Gosub, UpdateStats
+        ResultText .= ResultLine . "`n"
     }
-Return
+
+    return ResultText
+}
 
 ; -------------------------------------------------------------------------------
 ; LINE REPEAT
 ; -------------------------------------------------------------------------------
 
-RepeatText:
-    ; Get input values
-    Gui, Submit, NoHide
-
+Set_TextRepeat(TextToProcess, RepeatCount := 1, LineMode := "All", SpecificLines := "", SeparatorText := "", RepeatMode := "NewLine")
+{
     if (RepeatCount = "" || RepeatCount <= 0) {
         RepeatCount := 1
     }
 
-    ; Clear previous output
     OutputText := ""
+    InputLines := StrSplit(TextToProcess, "`n")
 
-    ; Split input text into lines
-    InputLines := StrSplit(InputText, "`n")
-
-    ; Determine which lines to process
-    if (LineModeAll = 1) {
-        ; All lines mode
+    if (LineMode = "All") {
         ProcessLines := InputLines
     } else {
-        ; Specific lines mode
         ProcessLines := []
         SpecificLinesList := StrSplit(SpecificLines, ",")
         Loop, % SpecificLinesList.Length() {
@@ -2946,32 +3455,26 @@ RepeatText:
         }
     }
 
-    ; Repeat text based on mode
-    if (RepeatModeNewLine = 1) {
-        ; New Line mode
+    if (RepeatMode = "NewLine") {
         Loop, %RepeatCount%
         {
             for index, line in ProcessLines {
                 OutputText .= line
 
-                ; Add separator if it's not the last iteration
                 if (index < ProcessLines.Length()) {
                     OutputText .= "`n"
                 }
             }
 
-            ; Add separator between repetitions
             if (A_Index < RepeatCount) {
                 OutputText .= (SeparatorText != "") ? "`n" . SeparatorText . "`n" : "`n"
             }
         }
     }
-    else {
-        ; Single Line mode
+    else if (RepeatMode = "SingleLine") {
         Loop, %RepeatCount%
         {
             for index, line in ProcessLines {
-                ; If separator is specified, use it between texts
                 if (SeparatorText != "") {
                     OutputText .= line . SeparatorText
                 } else {
@@ -2979,39 +3482,27 @@ RepeatText:
                 }
             }
         }
-        ; Remove trailing separator in single line mode
         if (SeparatorText != "") {
             OutputText := RTrim(OutputText, SeparatorText)
         }
     }
 
-    ; Update output field
-    GuiControl,, OutputText, %OutputText%
-    if (AutoInput == 1) {
-        Gosub, CopyToInput
-    }
-    Gosub, UpdateStats
-return
+    return OutputText
+}
 
 ; -------------------------------------------------------------------------------
-; COLUMNS
+; CONCATENATE
 ; -------------------------------------------------------------------------------
 
-ConcatenateColumns:
-    Gui, Submit, NoHide
-
-    Text1Content := InputText
-    Text2Content := SecondColumn
-    Separator := ColumnSeparator
-
-    Text1Lines := StrSplit(Text1Content, "`n")
-    Text2Lines := StrSplit(Text2Content, "`n")
+Set_ConcatenateColumns(Column1, Column2, Separator := "")
+{
+    Text1Lines := StrSplit(Column1, "`n")
+    Text2Lines := StrSplit(Column2, "`n")
 
     CombinedText := ""
 
     Loop, % Text1Lines.MaxIndex()
     {
-
         if (A_Index <= Text2Lines.MaxIndex())
             CombinedText .= Text1Lines[A_Index] Separator Text2Lines[A_Index] "`n"
         else
@@ -3027,279 +3518,16 @@ ConcatenateColumns:
         }
     }
 
-    CombinedText := RTrim(CombinedText, "`n")
-
-    GuiControl,, OutputText, % CombinedText
-Return
-
-; -------------------------------------------------------------------------------
-; DATE AND TIME
-; -------------------------------------------------------------------------------
-
-InsertDateTime() {
-    FormatTime, CurrentDateTime,, hh:mm tt dd/MM/yyyy
-    SendInput, %CurrentDateTime%
+    return RTrim(CombinedText, "`n")
 }
 
-; -------------------------------------------------------------------------------
-; EDIT ACTIONS
-; -------------------------------------------------------------------------------
-
-Copy() {
-    Send, ^c
-    return
+RepeatStr(str, count) {
+    result := ""
+    Loop, %count%
+        result .= str
+    return result
 }
 
-Paste() {
-    Send, ^v
-    return
+RegExEscape(str) {
+    return RegExReplace(str, "([\[\]\(\)\{\}\.\*\+\?\^\$\\\|])", "\\\$1")
 }
-
-SelectAll() {
-    Send, ^a
-    return
-}
-
-Cut() {
-    Send, ^x
-    return
-}
-
-Undo() {
-    Gosub, PreviousValue
-}
-
-Redo() {
-    Gosub, NextValue
-}
-
-; -------------------------------------------------------------------------------
-; RELOAD
-; -------------------------------------------------------------------------------
-
-ReloadScript() {
-    Reload
-}
-
-; -------------------------------------------------------------------------------
-; ---------------------------------- HOTKEYS ------------------------------------
-; -------------------------------------------------------------------------------
-
-#IfWinActive, Realm
-    Ctrl & MButton::
-        Edit_ZoomReset(Edit)
-        Edit_ZoomReset(Edit1)
-    Return
-#IfWinActive
-
-#IfWinActive, Realm
-    F5::
-        InsertDateTime()
-    return
-#IfWinActive
-
-#IfWinActive, Realm
-    Esc::
-        WinClose, A
-    return
-#IfWinActive
-
-; #IfWinActive, Realm
-;     ~LButton::
-;         CheckMouseOverControls()
-;     return
-; #IfWinActive
-
-#IfWinActive, Realm
-    ~LButton Up::
-        UpdateStatusBar(control)
-    return
-#IfWinActive
-
-#IfWinActive, Realm
-    ~^a::
-    ~+Left::
-    ~+Right::
-    ~^+Left::
-    ~^+Right::
-    ~+Home::
-    ~+^Home::
-    ~+End::
-    ~+^End::
-    ~Left::
-    ~Right::
-    ~Up::
-    ~Down::
-        Sleep, 100
-        UpdateStatusBar(control)
-    return
-#IfWinActive
-
-#IfWinActive Realm
-    ^BackSpace::
-        Send ^+{Left}{Del}
-    return
-#If
-
-#IfWinActive Realm
-    ^z::
-        Gosub, PreviousValue
-    return
-#If
-
-#IfWinActive Realm
-    ^y::
-    ^+z::
-        Gosub, NextValue
-    return
-#If
-
-#If MouseIsOver("Edit1") && WinActive("Realm") && (A_OSVersion ~= "WIN_(7|8|8\.1|VISTA|2003|XP|2000)")
-    ^WheelUp::
-        ZoomFont("Edit1", 1)
-    return
-
-    ^WheelDown::
-        ZoomFont("Edit1", -1)
-    return
-#If
-
-#If MouseIsOver("Edit2") && WinActive("Realm") && (A_OSVersion ~= "WIN_(7|8|8\.1|VISTA|2003|XP|2000)")
-    ^WheelUp::
-        ZoomFont("Edit2", 1)
-    return
-
-    ^WheelDown::
-        ZoomFont("Edit2", -1)
-    return
-#If
-
-#If MouseIsOver("Edit26") && WinActive("Realm") && (A_OSVersion ~= "WIN_(7|8|8\.1|VISTA|2003|XP|2000)")
-    +WheelUp::
-        ZoomFont("Edit26", 1)
-    return
-
-    +WheelDown::
-        ZoomFont("Edit26", -1)
-    return
-#If
-
-#If MouseIsOver("Edit1") || MouseIsOver("Edit2") || MouseIsOver("Edit26")
-    ~LButton::
-        while GetKeyState("LButton", "P")
-        {
-            UpdateStatusBar(control)
-            Sleep 50
-        }
-    return
-#If
-
-; -------------------------------------------------------------------------------
-; ---------------------------------- DIALOGS ------------------------------------
-; -------------------------------------------------------------------------------
-
-; -------------------------------------------------------------------------------
-; ABOUT
-; -------------------------------------------------------------------------------
-
-ShowAboutDialog() {
-    global version
-    AboutDescription := "Realm " . version "`n`nAdvanced Text Processing Tool`n`nCopyright (c) 2024-2025 finnjest"
-    OnMessage(0x6, "WM_ACTIVATE")
-    Gui, About:New, +AlwaysOnTop
-    Gui, About:-MinimizeBox
-    Gui, About:Font, s10, Segoe UI
-    ; Gui, About:Font, cGray
-    Gui, About:Add, Text, x10 y10 -E0x200  -VScroll , %AboutDescription%
-    Gui, Add, Link, x10 y110, <a href="https://github.com/finnjest/realm">https://github.com/finnjest/realm</a>
-    Gui, About:Show,, About
-}
-return
-
-; -------------------------------------------------------------------------------
-; ---------------------------------- TOOLTIPS -----------------------------------
-; -------------------------------------------------------------------------------
-
-; -------------------------------------------------------------------------------
-; CREATING TOOLTIP CONTROL
-; -------------------------------------------------------------------------------
-
-InlineHelp:
-    Help := New GuiControlTips(HGUI)
-    Help.SetDelayTimes(1000, 30000, -1)
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    Help.Attach(SBOption, "Stats are shown as: Input Text | Ouput Text or Column 1 | Column 2 | Output Text`nwith Column Mode enabled. Selected text stats are: Chars | Lines | Words")
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    Help.Attach(OutputToInputOption, "This will copy text from Output to Input.`nOutput field will be cleared.")
-    Help.Attach(ClearOption, "Pressing this button will result in clearing all exisiting edit fields.")
-    Help.Attach(UndoButton, "Undo")
-    Help.Attach(RedoButton, "Redo")
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    Help.Attach(SROption1, "The whitespace area above the first non-empty line`nwill be trimmed. Including the first leading space.")
-    Help.Attach(SROption2, "The whitespace area after the last non-empty line`nwill be trimmed. Including the last trailing space.")
-    Help.Attach(SROption3, "All whitespaces at the end of each line will be`ntrimmed. Empty lines wont be affected.")
-    Help.Attach(SROption4, "All whitespaces at the beginning of each line `nwill be trimmed. Empty lines wont be affected.")
-    Help.Attach(SROption5, "All non single whitespaces between words`nor characters will be removed.")
-    Help.Attach(SROption6, "All whitespace occurences will be replaced`nwith a single space.")
-    Help.Attach(SROption7, "All whitespace occurences will be removed.")
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    Help.Attach(LBBOption1, "For each line break group, only the specified amount`nwill be kept.")
-    Help.Attach(LBBOption2, "To each line break group only the specified amount`nwill be added.")
-    Help.Attach(LBBOption3, "From each line break group the specified amount of line`nbreaks will be removed.")
-    Help.Attach(LBBOption4, "All line breaks will be removed from the Input Text.")
-    Help.Attach(LBBOption5, "All line break groups will be replaced with spaces.`nThis action is known as 'Joining'.")
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    Help.Attach(LBEOption1, "Line break will be added before the specified character.")
-    Help.Attach(LBEOption2, "Line break will be added instead of the specified character.")
-    Help.Attach(LBEOption3, "Line break will be added after the specified character.")
-    Help.Attach(LBEOption4, "Line break will be replaced with the specified character.")
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    DDLDescription =
-    (
-1. Delete Lines Containing will remove all lines which contain the specified character.
-2. Delete NOT Lines Containing will delete all lines except those that contain the specified character.
-3. Delete Before or After will remove everything before or after the specified character.
-4. Delete Block will cut out a block of text which borders are the specified characters.
-    )
-    Help.Attach(DOption1, DDLDescription)
-    Help.Attach(DOption2, "The removing will be applied to each line individually, if chosen.`nOtherwise the action is applied to the whole text.")
-    Help.Attach(DOption3, "The removing will include the specified character(s).")
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    Help.Attach(DLOption1, "By default, two lines are considered duplicates, only if they`nare exactly the same, even when it comes to leading `nand trailing whitespaces. This option ignores them.")
-    Help.Attach(DLOption2, "By default, all duplicate lines, apart from the very first occurence, are removed.`nThis option replaces duplicates with emply lines.")
-    Help.Attach(DLOption3, "By default, the first unique word is kept, only its duplicates are deleted.`nThis option treats first unique occurence as its duplicates.")
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    Help.Attach(ELOption1, "Deletes only empty lines. Those that basically`nconsist of a line break.")
-    Help.Attach(ELOption2, "Deletes both empty and blank lines.")
-    Help.Attach(ELOption3, "Deletes only blank lines. Those that are`nnon-empty and consist of whitespace(s).")
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    Help.Attach(SCREdit, "This will simply delete all occurences of the specified`ncharacter. It only deletes characters, not words.")
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    Help.Attach(NExcludeEmpty, "Empty lines (those that consist of a line break)`nwill be kept, but excluded from numbering.")
-    Help.Attach(NExcludeBlank, "Blank lines (non-empty lines that consist only of whitespaces)`nwill be kept, but excluded from numbering.")
-    Help.Attach(NDeleteEmpty, "Empty lines will be excluded from numbering and deleted.")
-    Help.Attach(NDeleteBlank, "Blank lines will be excluded from numbering and deleted.")
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    Help.Attach(SORTOption1, "Reverses the sort order while preserving the selected`nsorting rules (alphabetical, line length or natural).")
-    Help.Attach(SORTOption2, "When enabled, sorts text in a case-sensitive way, prioritizing uppercase letters (A-Z)`nbefore lowercase (a-z). Works for alphabetical sorting only.")
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    Help.Attach(LROption1, "Define how many times the specified line(s) will be repeated.")
-    Help.Attach(LROption2, "All lines of Input Text will be repeated.")
-    Help.Attach(LROption3, "Only specified lines of Input Text will be repeated.")
-    Help.Attach(LROption4, "The character(s) that will separate repeated lines from each other.")
-    Help.Attach(LROption5, "All lines of Input Text will become a single string with all line breaks removed.`nThe specified number of repeated lines will be added to them.")
-    Help.Attach(LROption6, "The Input Text won't change. The specified number of repeated`nlines will be added after the very last line of Input Text.")
-    ; ---------------------------------------------------------------------------------------------------------------------------------------------
-    Help.Suspend(True)
-return
-
-RemoveToolTip:
-    ToolTip
-Return
-
-; -------------------------------------------------------------------------------
-; EXIT
-; -------------------------------------------------------------------------------
-
-GuiClose:
-ExitApp
