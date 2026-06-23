@@ -1,0 +1,18 @@
+# Changelog
+
+### [1.0.0] - 2025-06-11
+- First stable release
+
+### [1.0.1] - 2026-01-20
+- Added zoom support for edit fields for Windows 7 and earlier versions
+- Fixed unresponsive behavior when applying Title case after Upper case
+
+### [2.0.0] - 2026-02-19
+- Switched to a modular library system
+- Separated core logic into dedicated Set_* functions 
+- Added libRealm integration support
+- Improved input validation for numbering fields
+- Added Invert Case text transformation
+- Added text Enclosing functionality (no GUI)
+- Fixed conflicting options in Auto Result/Column Mode
+- Renamed "Sort-Position" tab to "Misc"

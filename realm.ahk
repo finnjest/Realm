@@ -1,10 +1,20 @@
-﻿#NoTrayIcon
-#SingleInstance, Force
+﻿#SingleInstance, Force
+SetWorkingDir, %A_ScriptDir%
 SetBatchLines, -1
-
 #MaxHotkeysPerInterval 500
-
 FileEncoding, UTF-8
+#NoEnv
+#NoTrayIcon
+
+; -------------------------------------------------------------------------------
+; VARIABLE PASSED FROM CORE SCRIPT
+; -------------------------------------------------------------------------------
+
+if (libRealm) {
+    Menu, Tray, Icon
+    ; Msgbox, %A_IconHidden%
+    return
+}
 
 ; -------------------------------------------------------------------------------
 ; VARIABLES
@@ -17,16 +27,16 @@ global KeepEmptyLines
 global LastFoundPos := 0
 global CurrentSavePath := ""
 
-AlwaysOnTop := 0
-AutoInput := 0
-ColumnView := 0
-InlineTooltip := 0
+global AlwaysOnTop := 0
+global AutoInput := 0
+global ColumnView := 0
+global InlineTooltip := 0
 ; editControls := ["Edit1", "Edit2"]
-g_OnCloseAction := "Exit"
+global g_OnCloseAction := "Exit"
 
-CurrentIndex := 1
-SavedValues := []
-CaretIndices := []
+global CurrentIndex := 1
+global SavedValues := []
+global CaretIndices := []
 
 ; -------------------------------------------------------------------------------
 ; PASSED PARAMETER HANDLE
@@ -45,16 +55,6 @@ if 0 > 0
     }
 }
 ; MsgBox, Parameter %A_Index%: %arg%
-
-; -------------------------------------------------------------------------------
-; PASSED VARIABLE FROM CORE SCRIPT
-; -------------------------------------------------------------------------------
-
-if (libRealm) {
-    Menu, Tray, Icon
-    ; Msgbox, %A_IconHidden%
-    return
-}
 
 ; -------------------------------------------------------------------------------
 ; TRAY ICON HANDLE
@@ -103,16 +103,16 @@ Menu, ZoomMenu, Add, Zoom In, ZoomIn
 Menu, ZoomMenu, Add, Zoom Out, ZoomOut
 Menu, ZoomMenu, Add, Restore Default Zoom, ResetFont
 
-Menu, TransparencyMenu, Add, 0`% (Opaque), SetTransparency, Radio
-Menu, TransparencyMenu, Add, 10`%, SetTransparency, Radio
-Menu, TransparencyMenu, Add, 20`%, SetTransparency, Radio
-Menu, TransparencyMenu, Add, 30`%, SetTransparency, Radio
-Menu, TransparencyMenu, Add, 40`%, SetTransparency, Radio
-Menu, TransparencyMenu, Add, 50`%, SetTransparency, Radio
-Menu, TransparencyMenu, Add, 60`%, SetTransparency, Radio
-Menu, TransparencyMenu, Add, 70`%, SetTransparency, Radio
-Menu, TransparencyMenu, Add, 80`%, SetTransparency, Radio
-Menu, TransparencyMenu, Add, 90`%, SetTransparency, Radio
+Menu, TransparencyMenu, Add, 0`% (Opaque), RealmSetTransparency, Radio
+Menu, TransparencyMenu, Add, 10`%, RealmSetTransparency, Radio
+Menu, TransparencyMenu, Add, 20`%, RealmSetTransparency, Radio
+Menu, TransparencyMenu, Add, 30`%, RealmSetTransparency, Radio
+Menu, TransparencyMenu, Add, 40`%, RealmSetTransparency, Radio
+Menu, TransparencyMenu, Add, 50`%, RealmSetTransparency, Radio
+Menu, TransparencyMenu, Add, 60`%, RealmSetTransparency, Radio
+Menu, TransparencyMenu, Add, 70`%, RealmSetTransparency, Radio
+Menu, TransparencyMenu, Add, 80`%, RealmSetTransparency, Radio
+Menu, TransparencyMenu, Add, 90`%, RealmSetTransparency, Radio
 
 Menu, ViewMenu, Add, Zoom, :ZoomMenu
 Menu, ViewMenu, Add, Transparency, :TransparencyMenu
@@ -121,7 +121,7 @@ Menu, ViewMenu, Add
 Menu, ViewMenu, Add, Status Bar, ToggleStatusBar
 Menu, ViewMenu, Check, Status Bar
 
-Menu, SettingsMenu, Add, Always On Top, ToggleAlwaysOnTop
+Menu, SettingsMenu, Add, Always On Top, RealmToggleAlwaysOnTop
 Menu, SettingsMenu, Uncheck, Always On Top
 Menu, SettingsMenu, Add, Auto Result, ToggleAutoInput
 Menu, SettingsMenu, Uncheck, Auto Result
@@ -137,7 +137,6 @@ Menu, HelpMenu, Add, Tooltips, HelpTooltips
 Menu, HelpMenu, Uncheck, Tooltips
 Menu, HelpMenu, Add, About, ShowAboutDialog
 
-; Create the Main Menu Bar
 Menu, MyMenuBar, Add, File, :FileMenu
 Menu, MyMenuBar, Add, Edit, :EditMenu
 Menu, MyMenuBar, Add, View, :ViewMenu
@@ -163,8 +162,9 @@ Gui, Font, s8, MS Shell Dlg
 ; GUI ADDITIONAL HANDLING
 ; -------------------------------------------------------------------------------
 
-OnMessage(0x6, "WM_ACTIVATE") ; Causes delayed dragging when nothing is activated
+; OnMessage(0x6, "WM_ACTIVATE") ; Causes delayed dragging when nothing is activated
 Gui, +dpiscale +hwndhwnd
+Gui, Add, Edit, x-1 y-1 w0 h0 ; Remove initial focus from the gui, doesn't cause a delay
 
 ; -------------------------------------------------------------------------------
 ; INPUT AND OUTPUT FIELDS
@@ -543,6 +543,7 @@ Gui Add, Button, x704 y49 w80 h23 gConcatenateColumns, Process
 if (!isSilent) {
     Gui, Show, w814 h750, Realm
     Gui, Show, AutoSize
+    GuiControl, Show, pB
 
     Gosub, InlineHelp
     Gosub, UpdateStats
@@ -723,7 +724,7 @@ ToggleStatusBar() {
 ; TOGGLE WINDOW ALWAYS ON TOP
 ; -------------------------------------------------------------------------------
 
-ToggleAlwaysOnTop() {
+RealmToggleAlwaysOnTop() {
     global AlwaysOnTop
     if (AlwaysOnTop = 0) {
         WinSet, AlwaysOnTop, On, A
@@ -776,7 +777,7 @@ ToggleAutoInput() {
     }
     else if (ColumnView = 1 && AutoInput = 0) {
         Tooltip, Disable Column Mode first.
-        SetTimer, RemoveToolTipRealm, -2000
+        SetTimer, RealmRemoveToolTip, -2000
     }
 }
 
@@ -814,7 +815,7 @@ ColumnMod() {
     }
     else if (AutoInput = 1 && ColumnView = 0) {
         Tooltip, Disable Auto Result first.
-        SetTimer, RemoveToolTipRealm, -2000
+        SetTimer, RealmRemoveToolTip, -2000
     }
 }
 
@@ -829,7 +830,7 @@ HelpTooltips:
         InlineTooltip := 1
         Help.Suspend(False)
         Tooltip, Inline help is enabled. Hovering over certain`ncontrols will display Help Tooltips.
-        SetTimer, RemoveToolTipRealm, -4000
+        SetTimer, RealmRemoveToolTip, -4000
     }
     else {
 
@@ -837,7 +838,7 @@ HelpTooltips:
         InlineTooltip := 0
         Help.Suspend(True)
         Tooltip, Inline help is disabled. Help Tooltips`nwont be shown.
-        SetTimer, RemoveToolTipRealm, -3000
+        SetTimer, RealmRemoveToolTip, -3000
     }
 return
 
@@ -845,7 +846,7 @@ return
 ; SET WINDOW TRANSPARENCY LEVEL
 ; -------------------------------------------------------------------------------
 
-SetTransparency() {
+RealmSetTransparency() {
     transparencyOptions := ["0% (Opaque)", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%"]
 
     for index, option in transparencyOptions {
@@ -893,7 +894,7 @@ FileSave:
     FileDelete, %CurrentSavePath%
     FileAppend, %OutputText%, %CurrentSavePath%
     Tooltip, Contents saved to %CurrentSavePath%
-    SetTimer, RemoveToolTipRealm, -2000
+    SetTimer, RealmRemoveToolTip, -2000
 return
 
 ; -------------------------------------------------------------------------------
@@ -909,7 +910,7 @@ FileSaveAs:
         FileDelete, %CurrentSavePath%
         FileAppend, %OutputText%, %CurrentSavePath%
         Tooltip, Contents saved to %CurrentSavePath%
-        SetTimer, RemoveToolTipRealm, -2000
+        SetTimer, RealmRemoveToolTip, -2000
     }
 return
 
@@ -937,7 +938,7 @@ CopyEditedTextToClipboard:
     GuiControlGet, OutputText,, OutputText
     Clipboard := OutputText
     ToolTip, Copied: %Clipboard%
-    SetTimer, RemoveToolTipRealm, -1500
+    SetTimer, RealmRemoveToolTip, -1500
 Return
 
 ; -------------------------------------------------------------------------------
@@ -1412,7 +1413,7 @@ FindButton:
                 ControlFocus, , ahk_id %InputTextHwnd%
             } else {
                 ToolTip, Text not found!
-                SetTimer, RemoveToolTipRealm, -1000
+                SetTimer, RealmRemoveToolTip, -1000
                 LastFoundPos := 0
             }
         } catch e {
@@ -1701,14 +1702,14 @@ StartChar:
         CleanedText := RegExReplace(CurrentText, "[0-9]", "")
         if (CurrentText != CleanedText) {
             Tooltip, Only letters are allowed.
-            SetTimer, RemoveToolTipRealm, -1500
+            SetTimer, RealmRemoveToolTip, -1500
         }
     } else if (NumberingMode1 || NumberingMode2) {
         GuiControlGet, CurrentText,, StartChar
         CleanedText := RegExReplace(CurrentText, "[^0-9]", "")
         if (CurrentText != CleanedText) {
             Tooltip, Only digits are allowed.
-            SetTimer, RemoveToolTipRealm, -1500
+            SetTimer, RealmRemoveToolTip, -1500
         }
     }
     if (CurrentText != CleanedText) {
@@ -1946,27 +1947,19 @@ ReloadRealm() {
         Edit_ZoomReset(Edit)
         Edit_ZoomReset(Edit1)
     Return
-#IfWinActive
 
-#IfWinActive, Realm
     F5::
         InsertDateTime()
     return
-#IfWinActive
 
-#IfWinActive, Realm
     Esc::
         WinClose, A
     return
-#IfWinActive
 
-#IfWinActive, Realm
     ~LButton Up::
         UpdateStatusBar(control)
     return
-#IfWinActive
 
-#IfWinActive, Realm
     ~^a::
     ~+Left::
     ~+Right::
@@ -1983,21 +1976,15 @@ ReloadRealm() {
         Sleep, 100
         UpdateStatusBar(control)
     return
-#IfWinActive
 
-#IfWinActive Realm
     ^BackSpace::
         Send ^+{Left}{Del}
     return
-#If
 
-#IfWinActive Realm
     ^z::
         Gosub, PreviousValue
     return
-#If
 
-#IfWinActive Realm
     ^y::
     ^+z::
         Gosub, NextValue
@@ -2054,14 +2041,15 @@ ReloadRealm() {
 
 ShowAboutDialog() {
     global version
-    AboutDescription := "Realm " . version "`n`nAdvanced Text Manipulating Tool`n`nCopyright (c) 2024-2026 finnjest"
-    OnMessage(0x6, "WM_ACTIVATE")
+    about := "Realm " . version "`n`nAdvanced Text Manipulating Tool`n`nCopyright (c) 2024-2026 finnjest"
+    ; OnMessage(0x6, "WM_ACTIVATE")
     Gui, About:New, +AlwaysOnTop
     Gui, About:-MinimizeBox
     Gui, About:Font, s10, Segoe UI
     Gui, Color, FFFFFF
+    Gui, About:Add, Edit, x-1 y-1 w0 h0
     ; Gui, About:Font, cGray
-    Gui, About:Add, Text, x10 y10 -E0x200  -VScroll , %AboutDescription%
+    Gui, About:Add, Text, x10 y10 -E0x200, % about
     Gui, Add, Link, x10 y110, <a href="https://github.com/finnjest/realm">https://github.com/finnjest/realm</a>
     Gui, About:Show,, About
 }
@@ -2072,7 +2060,7 @@ TrayShow:
     if (!g_ShowTrayIcon)
         Menu, Tray, NoIcon
     Gui, Show
-    WinActivate, Pegasys Wizard
+    WinActivate, Realm
 return
 
 ; -------------------------------------------------------------------------------
@@ -2152,7 +2140,7 @@ InlineHelp:
     Help.Suspend(True)
 return
 
-RemoveToolTipRealm:
+RealmRemoveToolTip:
     ToolTip
 Return
 
@@ -2338,6 +2326,7 @@ Set_TextEnclose(text, type, encLeft := "", encRight := "") {
 Set_TextSpaces(TextToProcess, TrimStart := false, TrimEnd := false, RemoveExtra := false, TrimAbove := false, TrimBelow := false, ReduceToSingle := false, RemoveAll := false)
 {
     text := TextToProcess
+    text := StrReplace(StrReplace(text, "`r`n", "`n"), "`r", "`n")
     result := ""
 
     if (TrimStart) {
@@ -2961,7 +2950,7 @@ Set_TextNumbering(TextToProcess, NumberingMode := "Numbers", StartChar := 1, Pre
     else if (NumberingMode = "Roman Numerals")
     {
         StartChar := StartChar ? StartChar : 1
-        StartChar := IsNumber(StartChar) ? StartChar : RomanToDecimal(StartChar)
+        StartChar := IsNum(StartChar) ? StartChar : RomanToDecimal(StartChar)
     }
     else
     {
@@ -3116,7 +3105,7 @@ RomanToDecimal(roman) {
     return result
 }
 
-IsNumber(value) {
+IsNum(value) {
     return (value+0) = value
 }
 
@@ -3327,7 +3316,7 @@ Set_TextCase_DEP(TextToProcess, CaseType := "Upper")
 Set_TextCase(text,type){
     static X:= ["AHK","AutoHotkey"]
     if (type="S") {
-        text := RegExReplace(RegExReplace(text, "(.*)", "$L{1}"), "(?<=[^a-zA-Z0-9_-]\s|\n).|^.", "$U{0}")
+        text := RegExReplace(RegExReplace(text, "(.*)", "$L{1}"), "(?<=[.!?]\s|\n|^).", "$U{0}")
     } else if (type="I")
         text := RegExReplace(text, "(\p{Lu})|(\p{Ll})", "$L1$U2") ; Unicode
     else text:=RegExReplace(text, "(.*)", "$" type "{1}")
